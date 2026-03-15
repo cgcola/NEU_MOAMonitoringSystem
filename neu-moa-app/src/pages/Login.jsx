@@ -90,7 +90,7 @@ export default function Login() {
             margin: 0,
             lineHeight: '1.6'
           }}>
-            Sign in to access the NEU Memorandum of Agreement Tracking System.
+            Sign in to access the NEU Memorandum of Agreement Monitoring System.
           </p>
         </div>
 

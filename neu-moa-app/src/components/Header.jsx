@@ -36,7 +36,7 @@ export default function Header({ role, userName, userEmail, userAvatar, handleSi
           <img src={neuLogo} alt="NEU Logo" style={{ width: '48px', height: '48px', objectFit: 'contain' }} />
           <div className="desktop-only">
             <h2 style={{ fontSize: '1.15rem', color: '#003366', margin: 0, fontWeight: '700' }}>NEU Memorandum of Agreement</h2>
-            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0, fontWeight: '500' }}>Tracking System</p>
+            <p style={{ fontSize: '0.8rem', color: '#888', margin: 0, fontWeight: '500' }}>Monitoring System</p>
           </div>
         </div>
         
