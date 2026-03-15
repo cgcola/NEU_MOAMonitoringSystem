@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import AnimatedBackground from '../components/AnimatedBackground'
 import { supabase } from '../supabaseClient'
 import { NEU_COLLEGES, NEU_INDUSTRIES } from '../constants'
 import { formatName, renderBadge } from '../utils/helpers'
@@ -193,7 +194,10 @@ export default function FacultyDashboard({ canMaintain }) {
 
   return (
     <div className="dashboard-container">
+      <AnimatedBackground />
       <Header role="Faculty" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
+      
+      {/* ... the rest of your dashboard code remains exactly the same ... */}
 
       {currentView === 'list' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -224,18 +228,21 @@ export default function FacultyDashboard({ canMaintain }) {
           <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible' }}>
             
             {/* Replace your Search & Filter div with this in ALL dashboards */}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: showFilters ? '20px' : '0' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
               
-              {/* Search Bar - Flexes to take up all remaining space on desktop */}
-              <div style={{ flex: '1 1 250px', position: 'relative' }}>
+              {/* Search Bar */}
+              <div style={{ flex: '1 1 250px', minWidth: '250px', position: 'relative' }}>
                 <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
               
-              {/* Filter Button - flex: '0 0 auto' prevents it from stretching on desktop */}
-              <button onClick={() => setShowFilters(!showFilters)} style={{ flex: '0 0 auto', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+              {/* Filter Button - Uses CSS class for responsive stretching */}
+              <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
-                <span className="desktop-only-flex" style={{ marginLeft: '8px' }}>Filters</span>
+                
+                {/* desktop-only class hides the word on mobile so icon auto-centers */}
+                <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
+                
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
 
@@ -472,18 +479,23 @@ export default function FacultyDashboard({ canMaintain }) {
 
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '24px', textTransform: 'uppercase', fontWeight: '600', marginTop: '32px' }}>MOA Information</h4>
             <div className="form-grid">
+              
+              {/* Left Column (Stacks first on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconDocGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Industry Type</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.industry_type}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : ''}</p>
-              </div>
-              <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconBuildingGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Endorsed by College</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.endorsed_by_college}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Expiration Date</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.expiration_date) ? new Date(selectedMoa.expiration_date).toLocaleDateString() : ''}</p>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{selectedMoa.endorsed_by_college}</p>
               </div>
+              
+              {/* Right Column (Stacks second on mobile) */}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : 'N/A'}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Expiration Date</span></div>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.expiration_date) ? new Date(selectedMoa.expiration_date).toLocaleDateString() : 'N/A'}</p>
+              </div>
+
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px' }}>
               <button onClick={() => setCurrentView('list')} style={{ padding: '12px 32px', background: '#f8f9fa', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>Close</button>

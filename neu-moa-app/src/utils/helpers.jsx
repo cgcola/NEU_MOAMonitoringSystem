@@ -63,26 +63,25 @@ export const renderBadge = (statusStr) => {
 
 // 3. Audit Trail Renderer
 export const renderAuditDetails = (log) => {
-  if (log.operation === 'INSERT') return <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>Initial record creation</p>;
-  if (log.operation === 'DELETE') return <p style={{ margin: 0, color: '#dc3545', fontSize: '0.8rem' }}>Moved record to deleted archive</p>;
-  if (log.operation === 'RECOVER') return <p style={{ margin: 0, color: '#198754', fontSize: '0.8rem' }}>Restored record to active view</p>;
+  if (log.operation === 'INSERT') return <span>Initial creation</span>;
+  if (log.operation === 'DELETE') return <span style={{ color: '#dc3545' }}>Moved record to trash</span>;
+  if (log.operation === 'RECOVER') return <span style={{ color: '#1e8e3e' }}>Restored record</span>;
 
   if (log.changes && typeof log.changes === 'object' && Object.keys(log.changes).length > 0) {
-    // Filter out noisy background system updates (like updated_at timestamps)
     const hiddenFields = ['updated_at', 'created_at', 'id'];
     const changes = Object.entries(log.changes).filter(([field]) => !hiddenFields.includes(field));
 
-    if (changes.length === 0) return <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>Updated record details</p>;
+    if (changes.length === 0) return <span>Updated record details</span>;
 
     return (
-      <ul style={{ margin: '4px 0 0 0', paddingLeft: '16px', color: '#666', fontSize: '0.75rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
         {changes.map(([field, val]) => (
-          <li key={field} style={{ marginBottom: '2px' }}>
-            Updated <b style={{ textTransform: 'capitalize' }}>{field.replace(/_/g, ' ')}</b> to <span style={{ color: '#111', fontWeight: '600' }}>"{String(val)}"</span>
-          </li>
+          <span key={field}>
+            Updated {field.replace(/_/g, ' ')} to <span style={{ color: '#333' }}>{String(val)}</span>
+          </span>
         ))}
-      </ul>
+      </div>
     );
   }
-  return <p style={{ margin: 0, color: '#666', fontSize: '0.8rem' }}>Updated record details</p>;
+  return <span>Updated record details</span>;
 };

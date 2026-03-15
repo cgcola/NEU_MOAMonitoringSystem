@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import AnimatedBackground from '../components/AnimatedBackground'
 import { supabase } from '../supabaseClient'
 import { NEU_COLLEGES, NEU_INDUSTRIES } from '../constants'
 import { formatName, renderBadge, renderAuditDetails } from '../utils/helpers'
@@ -256,6 +257,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="dashboard-container">
+      <AnimatedBackground />
       <Header role="Admin" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
 
       {currentView === 'list' && (
@@ -281,19 +283,18 @@ export default function AdminDashboard() {
           </div>
 
           <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible' }}>
-            {/* Replace your Search & Filter div with this in ALL dashboards */}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: showFilters ? '20px' : '0' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
               
-              {/* Search Bar - Flexes to take up all remaining space on desktop */}
-              <div style={{ flex: '1 1 250px', position: 'relative' }}>
+              {/* Search Bar */}
+              <div style={{ flex: '1 1 250px', minWidth: '250px', position: 'relative' }}>
                 <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
               
-              {/* Filter Button - flex: '0 0 auto' prevents it from stretching on desktop */}
-              <button onClick={() => setShowFilters(!showFilters)} style={{ flex: '0 0 auto', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+              {/* Filter Button */}
+              <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
-                <span className="desktop-only-flex" style={{ marginLeft: '8px' }}>Filters</span>
+                <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
 
@@ -357,7 +358,35 @@ export default function AdminDashboard() {
                               {historyPopoverId === moa.id && (
                                 <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: '0', background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', width: '340px', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
                                   <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
-                                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>{moaLogs.map(log => (<div key={log.id} style={{ padding: '16px', borderBottom: '1px solid #f5f5f5' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span style={{ fontWeight: '600', fontSize: '0.8rem', color: '#333' }}>{log.user_email || 'System User'}</span><span style={{ fontSize: '0.7rem', color: '#999' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span></div><div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: log.operation === 'INSERT' ? '#e6f4ea' : log.operation === 'DELETE' ? '#fce8e6' : '#e6f0fa', color: log.operation === 'INSERT' ? '#1e8e3e' : log.operation === 'DELETE' ? '#dc3545' : '#0d6efd' }}>{log.operation}</span>{renderAuditDetails(log)}</div></div>))}{moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}</div>
+                                  
+                                  {/* FIXED: Display full string (no split) */}
+                                  <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
+                                    {moaLogs.map((log, idx, arr) => {
+                                      const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
+                                      const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
+
+                                      return (
+                                        <div key={log.id} style={{ padding: '16px 0', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f0f0f0' }}>
+                                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                            <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>
+                                              {log.user_email || 'System'}
+                                            </span>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>
+                                              {opLabel}
+                                            </span>
+                                          </div>
+                                          <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
+                                            {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
+                                          </div>
+                                          <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>
+                                            {renderAuditDetails(log)}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                    {moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}
+                                  </div>
+
                                 </div>
                               )}
                             </div>
@@ -404,8 +433,36 @@ export default function AdminDashboard() {
                         </button>
                         {historyPopoverId === moa.id && (
                           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
-                            <div style={{ maxHeight: '250px', overflowY: 'auto' }}>{moaLogs.map(log => (<div key={log.id} style={{ padding: '16px', borderBottom: '1px solid #f5f5f5' }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}><span style={{ fontWeight: '600', fontSize: '0.8rem', color: '#333' }}>{log.user_email || 'System User'}</span><span style={{ fontSize: '0.7rem', color: '#999' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span></div><div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}><span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: log.operation === 'INSERT' ? '#e6f4ea' : log.operation === 'DELETE' ? '#fce8e6' : '#e6f0fa', color: log.operation === 'INSERT' ? '#1e8e3e' : log.operation === 'DELETE' ? '#dc3545' : '#0d6efd' }}>{log.operation}</span>{renderAuditDetails(log)}</div></div>))}{moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}</div>
+                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: '0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
+                            
+                            {/* FIXED: Display full string (no split) */}
+                            <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
+                              {moaLogs.map((log, idx, arr) => {
+                                const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
+                                const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
+
+                                return (
+                                  <div key={log.id} style={{ padding: '16px 0', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f0f0f0' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                      <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>
+                                        {log.user_email || 'System'}
+                                      </span>
+                                      <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>
+                                        {opLabel}
+                                      </span>
+                                    </div>
+                                    <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
+                                      {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
+                                    </div>
+                                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>
+                                      {renderAuditDetails(log)}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                              {moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}
+                            </div>
+
                           </div>
                         )}
                       </div>
@@ -448,7 +505,6 @@ export default function AdminDashboard() {
                 <p style={{ color: '#666', margin: 0, fontSize: '0.95rem' }}>Manage user accounts, roles, and permissions</p>
               </div>
               
-              {/* Add User Button - flex: '0 0 auto' keeps it tight, with the exact User+ SVG */}
               <button onClick={() => setCurrentView('userForm')} style={{ flex: '0 0 auto', background: '#0d6efd', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
                  <span className="desktop-only-flex">Add User</span>
@@ -735,37 +791,65 @@ export default function AdminDashboard() {
 
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '24px', textTransform: 'uppercase', fontWeight: '600', marginTop: '32px' }}>MOA Information</h4>
             <div className="form-grid">
+              
+              {/* Left Column (Stacks first on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconDocGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Industry Type</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.industry_type}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : ''}</p>
-              </div>
-              <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconBuildingGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Endorsed by College</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.endorsed_by_college}</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Expiration Date</span></div>
-                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.expiration_date) ? new Date(selectedMoa.expiration_date).toLocaleDateString() : ''}</p>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{selectedMoa.endorsed_by_college}</p>
               </div>
+              
+              {/* Right Column (Stacks second on mobile) */}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : 'N/A'}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Expiration Date</span></div>
+                <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.expiration_date) ? new Date(selectedMoa.expiration_date).toLocaleDateString() : 'N/A'}</p>
+              </div>
+
             </div>
+
+            {/* FIXED: Cleaner Card-Based Audit Trail for View Details */}
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: '600', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <IconHistory /> Audit Trail & History
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Audit Trail
             </h4>
-            <div style={{ background: '#f8f9fa', borderRadius: '12px', border: '1px solid #eee', padding: '20px', maxHeight: '350px', overflowY: 'auto' }}>
-              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).map((log, idx, arr) => (
-                <div key={log.id} style={{ marginBottom: idx === arr.length - 1 ? 0 : '16px', paddingBottom: idx === arr.length - 1 ? 0 : '16px', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #eaeaea' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                    <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>{log.user_email || 'System User'}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#999' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            
+            <div style={{ maxHeight: '400px', overflowY: 'auto', paddingRight: '8px' }}>
+              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).map((log) => {
+                const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
+                const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
+
+                return (
+                  <div key={log.id} style={{ background: '#f8f9fa', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
+                    
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      
+                      {/* FIXED: Display full string (no split) */}
+                      <span style={{ fontWeight: '600', fontSize: '0.95rem', color: '#00204a' }}>
+                        {log.user_email || 'System User'}
+                      </span>
+                      <span style={{ fontSize: '0.8rem', color: '#888' }}>
+                        {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: '700', padding: '4px 10px', borderRadius: '4px', background: theme.bg, color: theme.text, letterSpacing: '0.5px' }}>
+                        {opLabel}
+                      </span>
+                      <div style={{ flex: 1, color: '#555', fontSize: '0.9rem', marginTop: '2px' }}>
+                        {renderAuditDetails(log)}
+                      </div>
+                    </div>
+
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
-                    <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: log.operation === 'INSERT' ? '#e6f4ea' : log.operation === 'DELETE' ? '#fce8e6' : '#e6f0fa', color: log.operation === 'INSERT' ? '#1e8e3e' : log.operation === 'DELETE' ? '#dc3545' : '#0d6efd' }}>{log.operation}</span>
-                    <div style={{ flex: 1 }}>{renderAuditDetails(log)}</div>
-                  </div>
-                </div>
-              ))}
-              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).length === 0 && <p style={{ color: '#999', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>No history found for this record.</p>}
+                );
+              })}
+              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).length === 0 && <p style={{ color: '#999', fontSize: '0.85rem', margin: 0 }}>No history found.</p>}
             </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px' }}>
               <button onClick={() => setCurrentView('list')} style={{ padding: '12px 32px', background: '#f8f9fa', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>Close</button>
             </div>

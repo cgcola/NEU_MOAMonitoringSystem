@@ -174,3 +174,15 @@ html, body {
     display: none !important;
   }
 }
+
+/* Filter Button Desktop/Mobile behavior */
+.filter-btn-responsive {
+  flex: 0 0 auto; /* Stays compact on Desktop */
+}
+
+@media (max-width: 768px) {
+  .filter-btn-responsive {
+    flex: 1 1 100% !important; /* Stretches to full width on Mobile */
+    padding: 12px !important;
+  }
+}
