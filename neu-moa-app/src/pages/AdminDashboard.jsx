@@ -136,10 +136,10 @@ export default function AdminDashboard() {
   const totalUserPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE)
 
   const stats = {
-    approved: moas.filter(m => m.status.includes('APPROVED') && !m.deleted_at).length,
-    processing: moas.filter(m => m.status.includes('PROCESSING') && !m.deleted_at).length,
-    expired: moas.filter(m => m.status.includes('EXPIRED') && !m.status.includes('EXPIRING') && !m.deleted_at).length,
-    expiring: moas.filter(m => m.status.includes('EXPIRING') && !m.deleted_at).length,
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING') && !m.deleted_at).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
   }
 
   const handleView = (moa) => { setSelectedMoa(moa); setCurrentView('details') }
@@ -219,11 +219,25 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleAddUserSubmit = (e) => {
+  const handleAddUserSubmit = async (e) => {
     e.preventDefault();
-    showToast("Note: Admins invoke backend Edge Function here.", "success");
-    setCurrentView('users');
-    setNewUserParams({ full_name: '', email: '', role: 'Student', college: '' });
+    
+    // Insert the user into the database's Waiting List
+    const { error } = await supabase
+      .from('pending_roles')
+      .upsert([{ 
+        email: newUserParams.email, 
+        role: newUserParams.role, 
+        college: newUserParams.college 
+      }]);
+
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      showToast(`Success! When ${newUserParams.email} logs in with Google, they will be assigned as ${newUserParams.role}.`, 'success');
+      setCurrentView('users');
+      setNewUserParams({ full_name: '', email: '', role: 'Student', college: '' });
+    }
   }
 
   const SortableHeader = ({ label, sortKey, currentSort, onSort, style }) => {
@@ -255,22 +269,34 @@ export default function AdminDashboard() {
           </div>
 
           <div className="action-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
-            <button onClick={handleAddNewMoa} style={{ flex: '1 1 auto', background: '#0d6efd', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><span style={{ fontSize: '1.2rem' }}>+</span> Add New MOA</button>
-            <button onClick={() => setCurrentView('users')} style={{ flex: '1 1 auto', background: '#e6f0fa', color: '#0d6efd', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><IconUser /> Manage Users</button>
-            <button onClick={() => setIsViewingDeleted(!isViewingDeleted)} style={{ flex: '1 1 auto', background: '#fff', color: '#555', border: '1px solid #ccc', padding: '12px 24px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}><IconTrash /> {isViewingDeleted ? 'Show Active' : 'Show Deleted'}</button>
+            <button onClick={handleAddNewMoa} style={{ background: '#0d6efd', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '1.2rem', lineHeight: '1' }}>+</span> Add New MOA
+            </button>
+            <button onClick={() => setCurrentView('users')} style={{ background: '#9333ea', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <IconUser /> Manage Users
+            </button>
+            <button onClick={() => setIsViewingDeleted(!isViewingDeleted)} style={{ background: '#fff', color: '#555', border: '1px solid #ccc', padding: '10px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              <IconTrash /> {isViewingDeleted ? 'Show Active' : 'Show Deleted'}
+            </button>
           </div>
 
           <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible' }}>
-            <div className="responsive-flex" style={{ display: 'flex', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input type="text" className="search-bar" style={{ width: '100%', maxWidth: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            {/* Replace your Search & Filter div with this in ALL dashboards */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: showFilters ? '20px' : '0' }}>
+              
+              {/* Search Bar - Flexes to take up all remaining space on desktop */}
+              <div style={{ flex: '1 1 250px', position: 'relative' }}>
+                <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
-              <button onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 24px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+              
+              {/* Filter Button - flex: '0 0 auto' prevents it from stretching on desktop */}
+              <button onClick={() => setShowFilters(!showFilters)} style={{ flex: '0 0 auto', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only-flex" style={{ marginLeft: '8px' }}>Filters</span>
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
+
             </div>
 
             {showFilters && (
@@ -292,7 +318,7 @@ export default function AdminDashboard() {
 
                 {hasActiveFilters && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eaeaea' }}>
-                    <button onClick={clearFilters} style={{ background: '#fff', border: '1px solid #ddd', color: '#555', cursor: 'pointer', fontSize: '0.85rem', padding: '8px 16px', borderRadius: '6px', fontWeight: '600', transition: 'background 0.2s' }} onMouseOver={e => e.currentTarget.style.background = '#f0f0f0'} onMouseOut={e => e.currentTarget.style.background = '#fff'}>✕ Clear All Filters</button>
+                    <button onClick={clearFilters} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>✕ Clear Filters</button>
                   </div>
                 )}
               </div>
@@ -416,13 +442,16 @@ export default function AdminDashboard() {
             <button onClick={() => setCurrentView('list')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.95rem', fontWeight: '600', padding: 0, marginBottom: '24px' }}>
               ← Back to Dashboard
             </button>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '16px' }}>
-              <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+              <div style={{ flex: '1 1 250px' }}>
                 <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '8px', color: '#00204a' }}>User Management</h1>
                 <p style={{ color: '#666', margin: 0, fontSize: '0.95rem' }}>Manage user accounts, roles, and permissions</p>
               </div>
-              <button onClick={() => setCurrentView('userForm')} style={{ flex: '1 1 auto', background: '#0d6efd', color: '#fff', border: 'none', padding: '12px 24px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                <IconUser /> <span style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>+</span> Add User
+              
+              {/* Add User Button - flex: '0 0 auto' keeps it tight, with the exact User+ SVG */}
+              <button onClick={() => setCurrentView('userForm')} style={{ flex: '0 0 auto', background: '#0d6efd', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
+                 <span className="desktop-only-flex">Add User</span>
               </button>
             </div>
           </div>
@@ -468,15 +497,15 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td style={{ padding: '16px 24px', textAlign: 'center', verticalAlign: 'middle' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '12px' }}>
                           {u.role === 'faculty' && (
-                            <button onClick={() => handleUserToggle(u.id, 'can_maintain', u.can_maintain)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0d6efd' }} title={u.can_maintain ? "Revoke Rights" : "Grant Rights"}>
-                              <IconShield />
+                            <button onClick={() => handleUserToggle(u.id, 'can_maintain', u.can_maintain)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', color: '#1e8e3e', background: '#e6f4ea' }}>
+                              {u.can_maintain ? 'Remove MOA Rights' : 'Grant MOA Rights'}
                             </button>
                           )}
                           {u.role !== 'admin' && (
-                            <button onClick={() => handleUserToggle(u.id, 'is_blocked', u.is_blocked)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545' }} title={u.is_blocked ? "Unblock" : "Block"}>
-                              <IconBlock />
+                            <button onClick={() => handleUserToggle(u.id, 'is_blocked', u.is_blocked)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', color: u.is_blocked ? '#1e8e3e' : '#d93025', background: u.is_blocked ? '#e6f4ea' : '#fce8e6' }}>
+                              {u.is_blocked ? 'Unblock' : 'Block'}
                             </button>
                           )}
                         </div>
@@ -718,6 +747,24 @@ export default function AdminDashboard() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Expiration Date</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.expiration_date) ? new Date(selectedMoa.expiration_date).toLocaleDateString() : ''}</p>
               </div>
+            </div>
+            <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: '600', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <IconHistory /> Audit Trail & History
+            </h4>
+            <div style={{ background: '#f8f9fa', borderRadius: '12px', border: '1px solid #eee', padding: '20px', maxHeight: '350px', overflowY: 'auto' }}>
+              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).map((log, idx, arr) => (
+                <div key={log.id} style={{ marginBottom: idx === arr.length - 1 ? 0 : '16px', paddingBottom: idx === arr.length - 1 ? 0 : '16px', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #eaeaea' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>{log.user_email || 'System User'}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#999' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '2px 6px', borderRadius: '4px', background: log.operation === 'INSERT' ? '#e6f4ea' : log.operation === 'DELETE' ? '#fce8e6' : '#e6f0fa', color: log.operation === 'INSERT' ? '#1e8e3e' : log.operation === 'DELETE' ? '#dc3545' : '#0d6efd' }}>{log.operation}</span>
+                    <div style={{ flex: 1 }}>{renderAuditDetails(log)}</div>
+                  </div>
+                </div>
+              ))}
+              {logs.filter(l => String(l.moa_id) === String(selectedMoa.id)).length === 0 && <p style={{ color: '#999', fontSize: '0.85rem', margin: 0, textAlign: 'center' }}>No history found for this record.</p>}
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px' }}>
               <button onClick={() => setCurrentView('list')} style={{ padding: '12px 32px', background: '#f8f9fa', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>Close</button>

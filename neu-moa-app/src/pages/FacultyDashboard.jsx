@@ -113,10 +113,10 @@ export default function FacultyDashboard({ canMaintain }) {
   const totalPages = Math.ceil(sortedMoas.length / ITEMS_PER_PAGE)
 
   const stats = {
-    approved: moas.filter(m => m.status.includes('APPROVED')).length,
-    processing: moas.filter(m => m.status.includes('PROCESSING')).length,
-    expired: moas.filter(m => m.status.includes('EXPIRED') && !m.status.includes('EXPIRING')).length,
-    expiring: moas.filter(m => m.status.includes('EXPIRING')).length,
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING')).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING')).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING')).length,
   }
 
   const handleAddNew = async () => {
@@ -223,16 +223,22 @@ export default function FacultyDashboard({ canMaintain }) {
 
           <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible' }}>
             
-            <div className="responsive-flex" style={{ display: 'flex', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
-              <div style={{ flex: 1, position: 'relative' }}>
-                <input type="text" className="search-bar" style={{ width: '100%', maxWidth: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box' }} placeholder="Search by company name, contact..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            {/* Replace your Search & Filter div with this in ALL dashboards */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: showFilters ? '20px' : '0' }}>
+              
+              {/* Search Bar - Flexes to take up all remaining space on desktop */}
+              <div style={{ flex: '1 1 250px', position: 'relative' }}>
+                <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
-              <button onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 24px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
+              
+              {/* Filter Button - flex: '0 0 auto' prevents it from stretching on desktop */}
+              <button onClick={() => setShowFilters(!showFilters)} style={{ flex: '0 0 auto', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#333' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only-flex" style={{ marginLeft: '8px' }}>Filters</span>
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
+
             </div>
 
             {showFilters && (
@@ -263,7 +269,7 @@ export default function FacultyDashboard({ canMaintain }) {
 
                 {hasActiveFilters && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eaeaea' }}>
-                    <button onClick={clearFilters} style={{ background: '#fff', border: '1px solid #ddd', color: '#555', cursor: 'pointer', fontSize: '0.85rem', padding: '8px 16px', borderRadius: '6px', fontWeight: '600', transition: 'background 0.2s' }}>✕ Clear All Filters</button>
+                    <button onClick={clearFilters} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>✕ Clear Filters</button>
                   </div>
                 )}
               </div>

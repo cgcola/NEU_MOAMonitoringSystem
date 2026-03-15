@@ -162,3 +162,15 @@ html, body {
 .student-moa-card > button {
   margin-top: auto;
 }
+
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .desktop-only, .desktop-only-flex {
+    display: none !important;
+  }
+}
