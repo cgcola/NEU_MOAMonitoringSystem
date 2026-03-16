@@ -33,7 +33,7 @@ export default function FacultyDashboard({ canMaintain }) {
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [currentPage, setCurrentPage] = useState(1)
   // Dynamic Pagination State
-  const [itemsPerPage, setItemsPerPage] = useState(8); // Default to 8
+  const [itemsPerPage, setItemsPerPage] = useState(8); // Default to
 
   // Listen for window resize
   useEffect(() => {

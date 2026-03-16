@@ -108,7 +108,7 @@ export default function StudentDashboard() {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
+  const currentMoas = filteredMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
 
   const hasActiveFilters = searchQuery !== '' || filterCollege !== 'ALL' || filterIndustry !== 'ALL'
