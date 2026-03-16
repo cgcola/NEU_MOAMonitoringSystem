@@ -12,6 +12,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true)
   
   const [userEmail, setUserEmail] = useState('')
+  const [userId, setUserId] = useState('') // <--- NEW: Track the user's ID
   const [userName, setUserName] = useState('')
   const [userAvatar, setUserAvatar] = useState('')
 
@@ -22,6 +23,10 @@ export default function StudentDashboard() {
   const [filterIndustry, setFilterIndustry] = useState('ALL')
 
   const [toast, setToast] = useState(null)
+  
+  // ONBOARDING Modal States
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [selectedCollege, setSelectedCollege] = useState('')
   
   // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
@@ -57,6 +62,58 @@ export default function StudentDashboard() {
     };
   }, [])
   
+  // --- REAL-TIME USER PROTECTION & ONBOARDING ---
+  useEffect(() => {
+    if (userEmail && userId) { // <--- Wait until we have BOTH the email and the ID
+      checkMyProfile(); 
+
+      // Listen for updates across the whole table, but only react if the ID matches THIS user
+      const profileSub = supabase.channel('student-profile')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, (payload) => {
+          if (payload.new && payload.new.id === userId) {
+            checkMyProfile();
+          }
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(profileSub); };
+    }
+  }, [userEmail, userId]) // <--- Added userId as a dependency
+
+  // Added 'retries' so it patiently waits for the database trigger to finish!
+  const checkMyProfile = async (retries = 5) => {
+    const { data: myProfile } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
+    
+    if (myProfile) {
+      // 1. TRUE BLOCKING: Eject user instantly
+      if (myProfile.is_blocked) {
+        await supabase.auth.signOut();
+        window.location.reload(); // Throws them back to login page
+        return;
+      }
+      // 2. ONBOARDING: Show modal if college is missing
+      if (!myProfile.college || myProfile.college.trim() === '') {
+        setShowOnboarding(true);
+      } else {
+        setShowOnboarding(false);
+      }
+    } else if (retries > 0) {
+      // If the profile isn't there yet, wait half a second and check again!
+      setTimeout(() => checkMyProfile(retries - 1), 500);
+    }
+  }
+
+  const handleSaveCollege = async () => {
+    if (!selectedCollege) return;
+    const { error } = await supabase.from('profiles').update({ college: selectedCollege }).eq('email', userEmail);
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      setShowOnboarding(false);
+      showToast('Welcome aboard! College saved successfully.', 'success');
+    }
+  }
+
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry])
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000) }
@@ -65,6 +122,7 @@ export default function StudentDashboard() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setUserEmail(user.email)
+      setUserId(user.id) // <--- NEW: Save the ID so the Real-Time listener can use it
       if (user.user_metadata) {
         setUserAvatar(user.user_metadata.avatar_url || user.user_metadata.picture || '')
         setUserName(formatName(user.user_metadata.full_name || user.user_metadata.name || ''))
@@ -109,12 +167,38 @@ export default function StudentDashboard() {
   const currentMoas = filteredMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
   const totalPages = Math.max(1, Math.ceil(filteredMoas.length / itemsPerPage))
 
+  const FormLabel = ({ text, required }) => <label style={{ fontSize: '0.85rem', color: '#333', fontWeight: '600', marginBottom: '8px', display: 'block' }}>{text} {required && <span style={{ color: '#dc3545' }}>*</span>}</label>
+  const inputStyle = { padding: '14px', borderRadius: '8px', border: '1px solid #eaeaea', width: '100%', outline: 'none', backgroundColor: '#fff', fontSize: '0.95rem' }
+
   if (loading) return <p style={{ textAlign: 'center', padding: '50px' }}>Loading Student Workspace...</p>
 
   return (
     <div className="dashboard-container">
       <AnimatedBackground />
       <Header role="Student" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
+
+      {/* --- ONBOARDING MODAL OVERLAY --- */}
+      {showOnboarding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', padding: '40px', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'slideDown 0.3s ease' }}>
+            <h2 style={{ margin: '0 0 12px 0', color: '#00204a', fontSize: '1.5rem', fontWeight: '700' }}>Welcome to NEU MOA! 👋</h2>
+            <p style={{ color: '#666', marginBottom: '24px', fontSize: '0.95rem', lineHeight: '1.5' }}>To complete your profile, please select your college from the list below.</p>
+            
+            <div style={{ marginBottom: '32px' }}>
+              <FormLabel text="My College" required />
+              {/* Added id and name below to fix the React warning */}
+              <select id="college" name="college" value={selectedCollege} onChange={e => setSelectedCollege(e.target.value)} style={inputStyle}>
+                <option value="" disabled hidden>Please choose a college...</option>
+                {NEU_COLLEGES.filter(c => !c.includes('N/A')).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            
+            <button onClick={handleSaveCollege} disabled={!selectedCollege} style={{ width: '100%', padding: '14px', background: selectedCollege ? '#0d6efd' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: selectedCollege ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s ease' }}>
+              Save & Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {selectedMoa ? (
         <div style={{ maxWidth: '900px', margin: '0 auto', animation: 'fadeIn 0.3s ease' }}>
