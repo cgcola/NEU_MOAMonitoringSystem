@@ -41,7 +41,7 @@ export default function App() {
       const newProfile = {
         id: user.id,
         email: user.email,
-        role: 'Student', // Default role
+        role: 'student', // Default role
         full_name: user.user_metadata?.full_name || user.email.split('@')[0],
         can_maintain: false,
         is_blocked: false
