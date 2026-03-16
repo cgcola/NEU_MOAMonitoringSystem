@@ -147,8 +147,8 @@ export default function FacultyDashboard({ canMaintain }) {
     return 0;
   });
 
-  const currentMoas = sortedMoas.slice((currentPage - 1) * ITEMS_PER_PAGE, ((currentPage - 1) * ITEMS_PER_PAGE) + ITEMS_PER_PAGE)
-  const totalPages = Math.ceil(sortedMoas.length / ITEMS_PER_PAGE)
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
+  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
 
   const stats = {
     approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,

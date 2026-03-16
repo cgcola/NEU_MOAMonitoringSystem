@@ -156,8 +156,8 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  const currentMoas = sortedMoas.slice((currentPage - 1) * ITEMS_PER_PAGE, ((currentPage - 1) * ITEMS_PER_PAGE) + ITEMS_PER_PAGE)
-  const totalPages = Math.ceil(sortedMoas.length / ITEMS_PER_PAGE)
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
+  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
 
   const sortedUsers = [...users.filter(u => u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.role?.toLowerCase().includes(userSearchQuery.toLowerCase()))].sort((a, b) => {
     let aVal = userSortConfig.key === 'full_name' ? (a.full_name || a.email.split('@')[0]).toLowerCase() : (a[userSortConfig.key] || '').toLowerCase();
@@ -167,8 +167,8 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  const paginatedUsers = sortedUsers.slice((userCurrentPage - 1) * ITEMS_PER_PAGE, ((userCurrentPage - 1) * ITEMS_PER_PAGE) + ITEMS_PER_PAGE)
-  const totalUserPages = Math.ceil(sortedUsers.length / ITEMS_PER_PAGE)
+  const paginatedUsers = sortedUsers.slice((userCurrentPage - 1) * itemsPerPage, ((userCurrentPage - 1) * itemsPerPage) + itemsPerPage)
+  const totalUserPages = Math.ceil(sortedUsers.length / itemsPerPage)
 
   const stats = {
     approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
