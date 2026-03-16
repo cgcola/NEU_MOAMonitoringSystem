@@ -14,7 +14,9 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          queryParams: { prompt: 'select_account' }
+          queryParams: { prompt: 'select_account' },
+          // ADD THIS LINE: Explicitly tell Supabase where to redirect after login
+          redirectTo: window.location.origin 
         }
       });
       if (error) throw error;
@@ -24,7 +26,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
   return (
     <div style={{ 
       minHeight: '100vh', 
