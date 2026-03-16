@@ -15,7 +15,6 @@ export default function Login() {
         provider: 'google',
         options: {
           queryParams: { prompt: 'select_account' },
-          // ADD THIS LINE: Explicitly tell Supabase where to redirect after login
           redirectTo: window.location.origin 
         }
       });

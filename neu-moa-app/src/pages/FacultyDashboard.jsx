@@ -36,7 +36,23 @@ export default function FacultyDashboard({ canMaintain }) {
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
 
-  useEffect(() => { fetchMOAs(); getUserData(); }, [])
+  useEffect(() => { 
+    fetchMOAs(); 
+    getUserData(); 
+
+    // Set up real-time listener for the moas table
+    const facultyChannel = supabase
+      .channel('faculty-moas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => {
+        fetchMOAs();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(facultyChannel);
+    };
+  }, [])
+
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry, filterStatus, dateFrom, dateTo])
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000) }

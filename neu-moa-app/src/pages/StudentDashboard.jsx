@@ -25,7 +25,24 @@ export default function StudentDashboard() {
   const [currentPage, setCurrentPage] = useState(1)
   const ITEMS_PER_PAGE = 8
 
-  useEffect(() => { fetchApprovedMOAs(); getUserData(); }, [])
+  useEffect(() => { 
+    fetchApprovedMOAs(); 
+    getUserData(); 
+
+    // Set up real-time listener for the moas table
+    const moaSubscription = supabase
+      .channel('student-moas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => {
+        fetchApprovedMOAs();
+      })
+      .subscribe();
+
+    // Clean up on unmount
+    return () => {
+      supabase.removeChannel(moaSubscription);
+    };
+  }, [])
+  
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry])
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000) }
@@ -74,6 +91,7 @@ export default function StudentDashboard() {
   const totalPages = Math.ceil(filteredMoas.length / ITEMS_PER_PAGE)
 
   const hasActiveFilters = searchQuery !== '' || filterCollege !== 'ALL' || filterIndustry !== 'ALL'
+  const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0)
 
   if (loading) return <p style={{ textAlign: 'center', padding: '50px' }}>Loading Student Workspace...</p>
 

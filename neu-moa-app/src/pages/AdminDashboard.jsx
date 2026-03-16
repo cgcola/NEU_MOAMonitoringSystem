@@ -46,7 +46,22 @@ export default function AdminDashboard() {
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
   const [newUserParams, setNewUserParams] = useState({ full_name: '', email: '', role: 'Student', college: '' })
 
-  useEffect(() => { fetchData(); getUserData(); }, [])
+  useEffect(() => { 
+    fetchData(); 
+    getUserData(); 
+
+    // Listen to moas, profiles, and audit_logs tables on a single channel
+    const adminChannel = supabase.channel('admin-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_logs' }, () => fetchData())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(adminChannel);
+    };
+  }, [])
+  
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry, filterStatus, dateFrom, dateTo, isViewingDeleted])
   useEffect(() => { setUserCurrentPage(1) }, [userSearchQuery])
 
