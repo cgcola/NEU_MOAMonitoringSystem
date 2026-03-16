@@ -39,31 +39,25 @@ export default function AdminDashboard() {
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [userSortConfig, setUserSortConfig] = useState({ key: 'full_name', direction: 'asc' })
 
-  // --- SMART PAGINATION SYSTEM ---
+  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  
+  // Strictly 4 items on mobile, 8 items on desktop
+  const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const calculatePagination = (totalItems, currPage) => {
-    let limit = 8; // Desktop 
-    if (windowWidth <= 768) limit = 12; // Mobile
-    else if (windowWidth <= 1100) limit = 9; // Tablet 
-
-    // Orphan Prevention
-    if (totalItems > limit && totalItems <= limit + 3) {
-      limit = totalItems; 
-    }
-
-    const pages = Math.max(1, Math.ceil(totalItems / limit));
-    const safePage = Math.min(currPage > 0 ? currPage : 1, pages);
-    return { limit, pages, safePage };
-  }
+    const handleResize = () => {
+      const newLimit = window.innerWidth <= 768 ? 4 : 8;
+      if (newLimit !== itemsPerPage) {
+        setItemsPerPage(newLimit);
+        setCurrentPage(1); // Reset page on layout shift
+        setUserCurrentPage(1);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
   const [newUserParams, setNewUserParams] = useState({ full_name: '', email: '', role: 'Student', college: '' })
@@ -137,7 +131,7 @@ export default function AdminDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // --- 1. FILTER ---
+  // 1. FILTER MOAS
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -150,7 +144,7 @@ export default function AdminDashboard() {
       matchesDateRange && ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SORT ---
+  // 2. SORT MOAS
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; }
@@ -168,16 +162,12 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 3. PAGINATION ENGINE ---
-  const moaPaging = calculatePagination(sortedMoas.length, currentPage);
-  useEffect(() => { if (currentPage !== moaPaging.safePage) setCurrentPage(moaPaging.safePage) }, [currentPage, moaPaging.safePage])
-  
-  const userPaging = calculatePagination(sortedUsers.length, userCurrentPage);
-  useEffect(() => { if (userCurrentPage !== userPaging.safePage) setUserCurrentPage(userPaging.safePage) }, [userCurrentPage, userPaging.safePage])
+  // --- 3. SLICE DATA ---
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(sortedMoas.length / itemsPerPage))
 
-  // --- 4. SLICE ---
-  const currentMoas = sortedMoas.slice((moaPaging.safePage - 1) * moaPaging.limit, moaPaging.safePage * moaPaging.limit)
-  const paginatedUsers = sortedUsers.slice((userPaging.safePage - 1) * userPaging.limit, userPaging.safePage * userPaging.limit)
+  const paginatedUsers = sortedUsers.slice((userCurrentPage - 1) * itemsPerPage, (userCurrentPage - 1) * itemsPerPage + itemsPerPage)
+  const totalUserPages = Math.max(1, Math.ceil(sortedUsers.length / itemsPerPage))
 
   const stats = {
     approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
@@ -265,6 +255,7 @@ export default function AdminDashboard() {
 
   const handleAddUserSubmit = async (e) => {
     e.preventDefault();
+    
     const { error } = await supabase
       .from('pending_roles')
       .upsert([{ 
@@ -519,11 +510,11 @@ export default function AdminDashboard() {
               {sortedMoas.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No records found.</div>}
             </div>
 
-            {moaPaging.pages > 1 && (
+            {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '24px' }}>
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={moaPaging.safePage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: moaPaging.safePage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: moaPaging.safePage === 1 ? '#f5f5f5' : 'transparent', color: moaPaging.safePage === 1 ? '#999' : 'var(--neu-blue)', cursor: moaPaging.safePage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
-                <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{moaPaging.safePage}</strong> of {moaPaging.pages}</span>
-                <button onClick={() => setCurrentPage(p => Math.min(moaPaging.pages, p + 1))} disabled={moaPaging.safePage === moaPaging.pages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: moaPaging.safePage === moaPaging.pages ? '#e0e0e0' : 'var(--neu-blue)', background: moaPaging.safePage === moaPaging.pages ? '#f5f5f5' : 'transparent', color: moaPaging.safePage === moaPaging.pages ? '#999' : 'var(--neu-blue)', cursor: moaPaging.safePage === moaPaging.pages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
+                <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{currentPage}</strong> of {totalPages}</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === totalPages ? '#f5f5f5' : 'transparent', color: currentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
               </div>
             )}
           </div>
@@ -610,6 +601,7 @@ export default function AdminDashboard() {
               </table>
             </div>
 
+            {/* Mobile User Cards */}
             <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
               {paginatedUsers.map(u => (
                 <div key={u.id} style={{ border: '1px solid #eee', borderRadius: '12px', padding: '16px', background: u.is_blocked ? '#fff5f5' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -650,11 +642,11 @@ export default function AdminDashboard() {
 
           </div>
 
-          {userPaging.pages > 1 && (
+          {totalUserPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginBottom: '24px' }}>
-              <button onClick={() => setUserCurrentPage(p => Math.max(1, p - 1))} disabled={userPaging.safePage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: userPaging.safePage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: userPaging.safePage === 1 ? '#f5f5f5' : 'transparent', color: userPaging.safePage === 1 ? '#999' : 'var(--neu-blue)', cursor: userPaging.safePage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
-              <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{userPaging.safePage}</strong> of {userPaging.pages}</span>
-              <button onClick={() => setUserCurrentPage(p => Math.min(userPaging.pages, p + 1))} disabled={userPaging.safePage === userPaging.pages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: userPaging.safePage === userPaging.pages ? '#e0e0e0' : 'var(--neu-blue)', background: userPaging.safePage === userPaging.pages ? '#f5f5f5' : 'transparent', color: userPaging.safePage === userPaging.pages ? '#999' : 'var(--neu-blue)', cursor: userPaging.safePage === userPaging.pages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
+              <button onClick={() => setUserCurrentPage(p => Math.max(1, p - 1))} disabled={userCurrentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: userCurrentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: userCurrentPage === 1 ? '#f5f5f5' : 'transparent', color: userCurrentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: userCurrentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
+              <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{userCurrentPage}</strong> of {totalUserPages}</span>
+              <button onClick={() => setUserCurrentPage(p => Math.min(totalUserPages, p + 1))} disabled={userCurrentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: userCurrentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: userCurrentPage === totalPages ? '#f5f5f5' : 'transparent', color: userCurrentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: userCurrentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
             </div>
           )}
 
@@ -828,7 +820,6 @@ export default function AdminDashboard() {
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '24px', textTransform: 'uppercase', fontWeight: '600', marginTop: '32px' }}>MOA Information</h4>
             <div className="form-grid">
               
-              {/* Left Column (Stacks first on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconDocGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Industry Type</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.industry_type}</p>
@@ -836,7 +827,6 @@ export default function AdminDashboard() {
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{selectedMoa.endorsed_by_college}</p>
               </div>
               
-              {/* Right Column (Stacks second on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : 'N/A'}</p>
@@ -846,7 +836,6 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Cleaner Card-Based Audit Trail for View Details */}
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: '600', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Audit Trail
@@ -861,8 +850,6 @@ export default function AdminDashboard() {
                   <div key={log.id} style={{ background: '#f8f9fa', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      
-                      {/* FIXED: Display full string (no split) */}
                       <span style={{ fontWeight: '600', fontSize: '0.95rem', color: '#00204a' }}>
                         {log.user_email || 'System User'}
                       </span>

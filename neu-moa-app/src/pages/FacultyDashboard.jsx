@@ -32,30 +32,23 @@ export default function FacultyDashboard({ canMaintain }) {
   
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
 
-  // --- SMART PAGINATION SYSTEM ---
+  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  
+  // Strictly 4 items on mobile, 8 items on desktop
+  const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const calculatePagination = (totalItems, currPage) => {
-    let limit = 8; // Desktop 
-    if (windowWidth <= 768) limit = 12; // Mobile
-    else if (windowWidth <= 1100) limit = 9; // Tablet 
-
-    // Orphan Prevention
-    if (totalItems > limit && totalItems <= limit + 3) {
-      limit = totalItems; 
-    }
-
-    const pages = Math.max(1, Math.ceil(totalItems / limit));
-    const safePage = Math.min(currPage > 0 ? currPage : 1, pages);
-    return { limit, pages, safePage };
-  }
+    const handleResize = () => {
+      const newLimit = window.innerWidth <= 768 ? 4 : 8;
+      if (newLimit !== itemsPerPage) {
+        setItemsPerPage(newLimit);
+        setCurrentPage(1); // Reset page on layout shift
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
 
@@ -63,11 +56,16 @@ export default function FacultyDashboard({ canMaintain }) {
     fetchMOAs(); 
     getUserData(); 
 
-    const facultyChannel = supabase.channel('faculty-moas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => { fetchMOAs(); })
+    const facultyChannel = supabase
+      .channel('faculty-moas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => {
+        fetchMOAs();
+      })
       .subscribe();
 
-    return () => { supabase.removeChannel(facultyChannel); };
+    return () => {
+      supabase.removeChannel(facultyChannel);
+    };
   }, [])
 
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry, filterStatus, dateFrom, dateTo])
@@ -122,7 +120,7 @@ export default function FacultyDashboard({ canMaintain }) {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // 1. FILTER MOAS
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -135,7 +133,7 @@ export default function FacultyDashboard({ canMaintain }) {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // 2. SORT MOAS
+  // --- 2. SORT MOAS ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; } 
@@ -145,12 +143,9 @@ export default function FacultyDashboard({ canMaintain }) {
     return 0;
   });
 
-  // 3. PAGINATION ENGINE
-  const paging = calculatePagination(sortedMoas.length, currentPage);
-  useEffect(() => { if (currentPage !== paging.safePage) setCurrentPage(paging.safePage) }, [currentPage, paging.safePage])
-
-  // 4. SLICE
-  const currentMoas = sortedMoas.slice((paging.safePage - 1) * paging.limit, paging.safePage * paging.limit)
+  // --- 3. SLICE ---
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(sortedMoas.length / itemsPerPage))
 
   const stats = {
     approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
@@ -169,6 +164,7 @@ export default function FacultyDashboard({ canMaintain }) {
 
   const handleEdit = (moa) => { 
     let formStatus = moa.status || '';
+
     if (formStatus.includes('Awaiting')) formStatus = 'Processing - Awaiting signature by HTE partner';
     else if (formStatus.includes('Legal')) formStatus = 'Processing - Sent to Legal Office';
     else if (formStatus.includes('VPAA')) formStatus = 'Processing - Sent to VPAA/OP for approval';
@@ -177,10 +173,18 @@ export default function FacultyDashboard({ canMaintain }) {
     else if (formStatus.includes('No notarization')) formStatus = 'Approved - No notarization needed';
     else if (formStatus.includes('Expired')) formStatus = 'Expired - No renewal done';
     else if (formStatus.includes('Expiring')) formStatus = 'Expiring - Two months before';
+
     const formattedEffective = moa.effective_date ? moa.effective_date.split('T')[0] : '';
     const formattedExpiration = moa.expiration_date ? moa.expiration_date.split('T')[0] : '';
-    setFormData({ ...moa, status: formStatus, effective_date: formattedEffective, expiration_date: formattedExpiration }); 
-    setSelectedMoa(moa); setCurrentView('form') 
+
+    setFormData({ 
+      ...moa, 
+      status: formStatus,
+      effective_date: formattedEffective,
+      expiration_date: formattedExpiration
+    }); 
+    setSelectedMoa(moa); 
+    setCurrentView('form') 
   }
 
   const handleView = (moa) => { setSelectedMoa(moa); setCurrentView('details') }
@@ -189,7 +193,9 @@ export default function FacultyDashboard({ canMaintain }) {
     e.preventDefault(); if (!canMaintain) return showToast("You do not have permission to do this.", "error")
     let dbStatus = formData.status.replace(' - ', ': '); 
     const submitData = { ...formData, status: dbStatus }
+    
     if (dbStatus.includes('Processing')) { submitData.effective_date = null; submitData.expiration_date = null; }
+    
     if (selectedMoa) {
       const { error } = await supabase.from('moas').update(submitData).eq('id', selectedMoa.id)
       if (!error) { showToast('MOA Updated Successfully!', 'success'); fetchMOAs(); setCurrentView('list') } else { showToast(error.message, 'error') }
@@ -379,11 +385,11 @@ export default function FacultyDashboard({ canMaintain }) {
               {sortedMoas.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No records found.</div>}
             </div>
 
-            {paging.pages > 1 && (
+            {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '24px' }}>
-                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={paging.safePage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: paging.safePage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: paging.safePage === 1 ? '#f5f5f5' : 'transparent', color: paging.safePage === 1 ? '#999' : 'var(--neu-blue)', cursor: paging.safePage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
-                <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{paging.safePage}</strong> of {paging.pages}</span>
-                <button onClick={() => setCurrentPage(p => Math.min(paging.pages, p + 1))} disabled={paging.safePage === paging.pages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: paging.safePage === paging.pages ? '#e0e0e0' : 'var(--neu-blue)', background: paging.safePage === paging.pages ? '#f5f5f5' : 'transparent', color: paging.safePage === paging.pages ? '#999' : 'var(--neu-blue)', cursor: paging.safePage === paging.pages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
+                <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{currentPage}</strong> of {totalPages}</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === totalPages ? '#f5f5f5' : 'transparent', color: currentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
               </div>
             )}
           </div>

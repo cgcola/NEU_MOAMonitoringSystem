@@ -20,40 +20,41 @@ export default function StudentDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCollege, setFilterCollege] = useState('ALL')
   const [filterIndustry, setFilterIndustry] = useState('ALL')
-  const [toast, setToast] = useState(null)
 
-  // --- SMART PAGINATION SYSTEM ---
+  const [toast, setToast] = useState(null)
+  
+  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth)
+  
+  // Strictly 4 items on mobile, 8 items on desktop
+  const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth)
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
-  const calculatePagination = (totalItems, currPage) => {
-    let limit = 8; // Desktop 
-    if (windowWidth <= 768) limit = 12; // Mobile (let them scroll more)
-    else if (windowWidth <= 1100) limit = 9; // Tablet (3x3 grid)
-
-    // Orphan Prevention: If there are 9, 10, or 11 items, just show them all on Page 1!
-    if (totalItems > limit && totalItems <= limit + 3) {
-      limit = totalItems; 
-    }
-
-    const pages = Math.max(1, Math.ceil(totalItems / limit));
-    const safePage = Math.min(currPage > 0 ? currPage : 1, pages);
-    return { limit, pages, safePage };
-  }
+    const handleResize = () => {
+      const newLimit = window.innerWidth <= 768 ? 4 : 8;
+      if (newLimit !== itemsPerPage) {
+        setItemsPerPage(newLimit);
+        setCurrentPage(1); // Reset page on layout shift
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [itemsPerPage]);
 
   useEffect(() => { 
     fetchApprovedMOAs(); 
     getUserData(); 
-    const moaSubscription = supabase.channel('student-moas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => fetchApprovedMOAs())
+
+    const moaSubscription = supabase
+      .channel('student-moas')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => {
+        fetchApprovedMOAs();
+      })
       .subscribe();
-    return () => { supabase.removeChannel(moaSubscription); };
+
+    return () => {
+      supabase.removeChannel(moaSubscription);
+    };
   }, [])
   
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry])
@@ -81,7 +82,11 @@ export default function StudentDashboard() {
     setLoading(false)
   }
 
-  const clearFilters = () => { setSearchQuery(''); setFilterCollege('ALL'); setFilterIndustry('ALL') }
+  const clearFilters = () => {
+    setSearchQuery('')
+    setFilterCollege('ALL')
+    setFilterIndustry('ALL')
+  }
 
   const renderStudentBadge = () => (
     <span style={{ display: 'inline-block', background: '#e6f4ea', color: '#1e8e3e', border: '1px solid #cce8d6', padding: '4px 14px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: '600', textAlign: 'center', whiteSpace: 'nowrap', maxWidth: '100%' }}>
@@ -92,7 +97,7 @@ export default function StudentDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // 1. FILTER
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     const searchLower = searchQuery.toLowerCase()
     return (filterCollege === 'ALL' || m.endorsed_by_college === filterCollege) &&
@@ -100,12 +105,9 @@ export default function StudentDashboard() {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // 2. PAGINATION ENGINE
-  const paging = calculatePagination(filteredMoas.length, currentPage);
-  useEffect(() => { if (currentPage !== paging.safePage) setCurrentPage(paging.safePage) }, [currentPage, paging.safePage])
-
-  // 3. SLICE DATA
-  const currentMoas = filteredMoas.slice((paging.safePage - 1) * paging.limit, paging.safePage * paging.limit)
+  // --- 2. SLICE MOAS ---
+  const currentMoas = filteredMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(filteredMoas.length / itemsPerPage))
 
   if (loading) return <p style={{ textAlign: 'center', padding: '50px' }}>Loading Student Workspace...</p>
 
@@ -140,6 +142,7 @@ export default function StudentDashboard() {
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconLocation /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Company Address</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.address}</p>
+                
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconMail /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Contact Email</span></div>
                 <p style={{ color: '#0d6efd', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{selectedMoa.email_address}</p>
               </div>
@@ -156,6 +159,7 @@ export default function StudentDashboard() {
         </div>
       ) : (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
+          
           <h1 style={{ fontSize: '1.75rem', fontWeight: '700', color: '#00204a', margin: '0 0 4px 0' }}>Student Dashboard</h1>
           <p style={{ color: '#666', margin: '0 0 24px 0', fontSize: '0.95rem' }}>Browse approved MOA partnerships</p>
 
@@ -166,15 +170,21 @@ export default function StudentDashboard() {
 
           <div className="dashboard-card" style={{ padding: '24px', marginBottom: '32px' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
+              
+              {/* Search Bar */}
               <div style={{ flex: '1 1 250px', minWidth: '250px', position: 'relative' }}>
                 <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
+              
+              {/* Filter Button - Uses CSS class for responsive stretching */}
               <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
+                
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
+
             </div>
             
             {showFilters && (
@@ -201,23 +211,43 @@ export default function StudentDashboard() {
           <div className="student-moa-grid">
             {currentMoas.map((moa) => (
               <div key={moa.id} className="student-moa-card">
+                
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '24px', textAlign: 'center', gap: '12px' }}>
-                  <div style={{ width: '48px', height: '48px', background: '#e6f0fa', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconBuildingBlue /></div>
+                  <div style={{ width: '48px', height: '48px', background: '#e6f0fa', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <IconBuildingBlue />
+                  </div>
                   <div style={{ width: '100%' }}>
                     <h3 style={{ fontSize: '1.1rem', color: '#111', margin: '0 0 12px 0', lineHeight: '1.3', fontWeight: '700' }}>{moa.company_name}</h3>
-                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>{renderStudentBadge()}</div>
+                    <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                      {renderStudentBadge()}
+                    </div>
                   </div>
                 </div>
 
                 <div style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}><div style={{ marginTop: '2px', color: '#888' }}><IconLocation /></div><span style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.4' }}>{moa.address}</span></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ color: '#888' }}><IconUserGrey /></div><span style={{ fontSize: '0.85rem', color: '#666' }}>{moa.contact_person}</span></div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}><div style={{ color: '#888' }}><IconMail /></div><span style={{ fontSize: '0.85rem', color: '#0d6efd' }}>{moa.email_address}</span></div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
+                    <div style={{ marginTop: '2px', color: '#888' }}><IconLocation /></div>
+                    <span style={{ fontSize: '0.85rem', color: '#666', lineHeight: '1.4' }}>{moa.address}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ color: '#888' }}><IconUserGrey /></div>
+                    <span style={{ fontSize: '0.85rem', color: '#666' }}>{moa.contact_person}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ color: '#888' }}><IconMail /></div>
+                    <span style={{ fontSize: '0.85rem', color: '#0d6efd' }}>{moa.email_address}</span>
+                  </div>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}><span style={{ color: '#999' }}>Industry</span><span style={{ color: '#333', fontWeight: '500', textAlign: 'right', maxWidth: '60%' }}>{moa.industry_type?.split('/')[0]}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}><span style={{ color: '#999' }}>College</span><span style={{ color: '#333', fontWeight: '500', textAlign: 'right', maxWidth: '60%' }}>{moa.endorsed_by_college?.replace('College of ', '')}</span></div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                    <span style={{ color: '#999' }}>Industry</span>
+                    <span style={{ color: '#333', fontWeight: '500', textAlign: 'right', maxWidth: '60%' }}>{moa.industry_type?.split('/')[0]}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+                    <span style={{ color: '#999' }}>College</span>
+                    <span style={{ color: '#333', fontWeight: '500', textAlign: 'right', maxWidth: '60%' }}>{moa.endorsed_by_college?.replace('College of ', '')}</span>
+                  </div>
                 </div>
 
                 <button onClick={() => setSelectedMoa(moa)} style={{ width: '100%', padding: '12px', background: '#fff', color: '#0d6efd', border: '1px solid #e6f0fa', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px', transition: 'background 0.2s ease' }} onMouseOver={e => e.currentTarget.style.background = '#f0f7ff'} onMouseOut={e => e.currentTarget.style.background = '#fff'}>
@@ -228,11 +258,11 @@ export default function StudentDashboard() {
             {currentMoas.length === 0 && <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '40px', color: '#999' }}>No approved MOAs found.</div>}
           </div>
 
-          {paging.pages > 1 && (
+          {totalPages > 1 && (
             <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '32px' }}>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={paging.safePage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: paging.safePage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: paging.safePage === 1 ? '#f5f5f5' : 'transparent', color: paging.safePage === 1 ? '#999' : 'var(--neu-blue)', cursor: paging.safePage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
-              <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{paging.safePage}</strong> of {paging.pages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(paging.pages, p+1))} disabled={paging.safePage === paging.pages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: paging.safePage === paging.pages ? '#e0e0e0' : 'var(--neu-blue)', background: paging.safePage === paging.pages ? '#f5f5f5' : 'transparent', color: paging.safePage === paging.pages ? '#999' : 'var(--neu-blue)', cursor: paging.safePage === paging.pages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
+              <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{currentPage}</strong> of {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === totalPages ? '#f5f5f5' : 'transparent', color: currentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
             </div>
           )}
         </div>
