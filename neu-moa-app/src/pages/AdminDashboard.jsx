@@ -40,18 +40,11 @@ export default function AdminDashboard() {
   const [userFilterRole, setUserFilterRole] = useState('ALL')
   const [userFilterStatus, setUserFilterStatus] = useState('ALL')
 
-  // ONBOARDING Modal States
-  const [showOnboarding, setShowOnboarding] = useState(false)
-  const [selectedCollege, setSelectedCollege] = useState('')
-
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [userSortConfig, setUserSortConfig] = useState({ key: 'full_name', direction: 'asc' })
 
-  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
-  
-  // Strictly 4 items on mobile, 8 items on desktop
   const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
@@ -59,7 +52,7 @@ export default function AdminDashboard() {
       const newLimit = window.innerWidth <= 768 ? 4 : 8;
       if (newLimit !== itemsPerPage) {
         setItemsPerPage(newLimit);
-        setCurrentPage(1); // Reset page on layout shift
+        setCurrentPage(1); 
         setUserCurrentPage(1);
       }
     };
@@ -68,7 +61,7 @@ export default function AdminDashboard() {
   }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
-  const [newUserParams, setNewUserParams] = useState({ full_name: '', email: '', role: 'Student', college: '' })
+  const [newUserParams, setNewUserParams] = useState({ full_name: '', email: '', role: 'student', college: '' })
 
   useEffect(() => { 
     fetchData(); 
@@ -85,33 +78,6 @@ export default function AdminDashboard() {
     };
   }, [])
   
-  // --- REAL-TIME USER PROTECTION & ONBOARDING ---
-  useEffect(() => {
-    if (userEmail && users.length > 0) {
-      const myProfile = users.find(u => u.email === userEmail);
-      if (myProfile) {
-        
-        // 1. TRUE BLOCKING: If this current user is blocked, kick them out forcibly
-        if (myProfile.is_blocked) {
-          supabase.auth.signOut().then(() => {
-            window.location.reload(); // Returns them to login screen
-          });
-          return;
-        }
-
-        // 2. ONBOARDING: Show modal if college is missing
-        if (!myProfile.college || myProfile.college.trim() === '') {
-          if (myProfile.role === 'admin') {
-            // Auto-assign Admins so they don't get stuck in the modal
-            supabase.from('profiles').update({ college: 'N/A (For Admin)' }).eq('email', userEmail).then(() => fetchData());
-          } else {
-            setShowOnboarding(true);
-          }
-        }
-      }
-    }
-  }, [userEmail, users])
-
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry, filterStatus, dateFrom, dateTo, isViewingDeleted])
   useEffect(() => { setUserCurrentPage(1) }, [userSearchQuery, userFilterRole, userFilterStatus])
 
@@ -159,18 +125,6 @@ export default function AdminDashboard() {
     setMoas(processedMoas); setUsers(userData || []); setLogs(logData || []); setLoading(false)
   }
 
-  const handleSaveCollege = async () => {
-    if (!selectedCollege) return;
-    const { error } = await supabase.from('profiles').update({ college: selectedCollege }).eq('email', userEmail);
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      setShowOnboarding(false);
-      showToast('Welcome aboard! College saved successfully.', 'success');
-      fetchData();
-    }
-  }
-
   const clearFilters = () => { setSearchQuery(''); setFilterCollege('ALL'); setFilterIndustry('ALL'); setFilterStatus('ALL'); setDateFrom(''); setDateTo(''); }
   const handleSortMoas = (key) => setMoaSortConfig({ key, direction: moaSortConfig.key === key && moaSortConfig.direction === 'asc' ? 'desc' : 'asc' });
   const handleSortUsers = (key) => setUserSortConfig({ key, direction: userSortConfig.key === key && userSortConfig.direction === 'asc' ? 'desc' : 'asc' });
@@ -178,7 +132,6 @@ export default function AdminDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -191,7 +144,6 @@ export default function AdminDashboard() {
       matchesDateRange && ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SORT MOAS ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; }
@@ -201,10 +153,8 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 3. CRASH-PROOF USER FILTER & SORT ---
   const filteredUsers = users.filter(u => {
     const searchLower = userSearchQuery.toLowerCase();
-    // Use fallback strings ('') to prevent null errors from crashing the search
     const safeName = (u.full_name || '').toLowerCase();
     const safeEmail = (u.email || '').toLowerCase();
     const safeRole = (u.role || '').toLowerCase();
@@ -224,7 +174,6 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 4. SLICE DATA ---
   const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
   const totalPages = Math.max(1, Math.ceil(sortedMoas.length / itemsPerPage))
 
@@ -242,7 +191,6 @@ export default function AdminDashboard() {
 
   const handleEdit = (moa) => {
     let formStatus = moa.status || '';
-
     if (formStatus.includes('Awaiting')) formStatus = 'Processing - Awaiting signature by HTE partner';
     else if (formStatus.includes('Legal')) formStatus = 'Processing - Sent to Legal Office';
     else if (formStatus.includes('VPAA')) formStatus = 'Processing - Sent to VPAA/OP for approval';
@@ -255,14 +203,8 @@ export default function AdminDashboard() {
     const formattedEffective = moa.effective_date ? moa.effective_date.split('T')[0] : '';
     const formattedExpiration = moa.expiration_date ? moa.expiration_date.split('T')[0] : '';
 
-    setFormData({
-      ...moa,
-      status: formStatus,
-      effective_date: formattedEffective,
-      expiration_date: formattedExpiration
-    });
-    setSelectedMoa(moa);
-    setCurrentView('form')
+    setFormData({ ...moa, status: formStatus, effective_date: formattedEffective, expiration_date: formattedExpiration });
+    setSelectedMoa(moa); setCurrentView('form')
   }
 
   const handleAddNewMoa = async () => {
@@ -303,17 +245,29 @@ export default function AdminDashboard() {
 
   const handleUserToggle = async (userId, field, currentVal) => {
     const { error } = await supabase.from('profiles').update({ [field]: !currentVal }).eq('id', userId)
+    if (error) { showToast(error.message, 'error'); } else { showToast(`User successfully updated.`, 'success'); fetchData(); }
+  }
+
+  // --- NEW ROLE CHANGE FUNCTION ---
+  const handleRoleChange = async (userId, newRole) => {
+    let updates = { role: newRole };
+    
+    // Automatically manage maintainer rights based on new role
+    if (newRole === 'admin') updates.can_maintain = true;
+    if (newRole === 'student') updates.can_maintain = false;
+
+    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
     if (error) {
-      showToast(error.message, 'error'); 
-    } else { 
-      showToast(`User successfully updated.`, 'success'); 
-      fetchData(); 
+      showToast(error.message, 'error');
+    } else {
+      showToast('User role successfully updated.', 'success');
+      fetchData();
     }
   }
 
   const handleAddUserRoleChange = (e) => {
     const selectedRole = e.target.value;
-    if (selectedRole === 'Admin') {
+    if (selectedRole === 'admin') {
       setNewUserParams({ ...newUserParams, role: selectedRole, college: 'N/A (For Admin)' });
     } else {
       setNewUserParams({ ...newUserParams, role: selectedRole });
@@ -322,21 +276,11 @@ export default function AdminDashboard() {
 
   const handleAddUserSubmit = async (e) => {
     e.preventDefault();
-    
-    const { error } = await supabase
-      .from('pending_roles')
-      .upsert([{ 
-        email: newUserParams.email, 
-        role: newUserParams.role, 
-        college: newUserParams.college 
-      }]);
-
-    if (error) {
-      showToast(error.message, 'error');
-    } else {
-      showToast(`Success! When ${newUserParams.email} logs in with Google, they will be assigned as ${newUserParams.role}.`, 'success');
-      setCurrentView('users');
-      setNewUserParams({ full_name: '', email: '', role: 'Student', college: '' });
+    const { error } = await supabase.from('pending_roles').upsert([{ email: newUserParams.email, role: newUserParams.role, college: newUserParams.college }]);
+    if (error) { showToast(error.message, 'error'); } 
+    else {
+      showToast(`Success! When ${newUserParams.email} logs in, they will be assigned as ${newUserParams.role}.`, 'success');
+      setCurrentView('users'); setNewUserParams({ full_name: '', email: '', role: 'student', college: '' });
     }
   }
 
@@ -358,28 +302,6 @@ export default function AdminDashboard() {
     <div className="dashboard-container">
       <AnimatedBackground />
       <Header role="Admin" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
-
-      {/* --- ONBOARDING MODAL OVERLAY --- */}
-      {showOnboarding && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
-          <div style={{ background: '#fff', padding: '40px', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'slideDown 0.3s ease' }}>
-            <h2 style={{ margin: '0 0 12px 0', color: '#00204a', fontSize: '1.5rem', fontWeight: '700' }}>Welcome to NEU MOA! 👋</h2>
-            <p style={{ color: '#666', marginBottom: '24px', fontSize: '0.95rem', lineHeight: '1.5' }}>To complete your profile, please select your college from the list below.</p>
-            
-            <div style={{ marginBottom: '32px' }}>
-              <FormLabel text="My College" required />
-              <select value={selectedCollege} onChange={e => setSelectedCollege(e.target.value)} style={inputStyle}>
-                <option value="" disabled hidden>Please choose a college...</option>
-                {NEU_COLLEGES.filter(c => !c.includes('N/A')).map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            
-            <button onClick={handleSaveCollege} disabled={!selectedCollege} style={{ width: '100%', padding: '14px', background: selectedCollege ? '#0d6efd' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: selectedCollege ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s ease' }}>
-              Save & Continue
-            </button>
-          </div>
-        </div>
-      )}
 
       {currentView === 'list' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -416,7 +338,6 @@ export default function AdminDashboard() {
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
-
             </div>
 
             {showFilters && (
@@ -520,85 +441,6 @@ export default function AdminDashboard() {
               </table>
             </div>
 
-            <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '24px' }}>
-              {currentMoas.map(moa => {
-                const moaLogs = logs.filter(l => String(l.moa_id) === String(moa.id));
-                return (
-                  <div key={moa.id} style={{ background: isViewingDeleted ? '#fdf5f5' : '#fff', border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-                    
-                    <div style={{ marginBottom: '20px' }}>
-                      <h3 style={{ margin: '0 0 12px 0', fontSize: '1.15rem', color: '#00204a', fontWeight: '700', lineHeight: '1.3' }}>{moa.company_name}</h3>
-                      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-                        {renderBadge(moa.status)}
-                      </div>
-                    </div>
-                    
-                    <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#888' }}>{moa.hte_id}</p>
-
-                    <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: '#999', minWidth: '65px' }}>Industry:</span> <span style={{ fontWeight: '500', color: '#333' }}>{moa.industry_type?.split('/')[0]}</span></div>
-                      <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: '#999', minWidth: '65px' }}>College:</span> <span style={{ fontWeight: '500', color: '#333' }}>{moa.endorsed_by_college?.replace('College of ', '')}</span></div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <IconCalendar /> <span style={{ color: '#999', marginLeft: '-2px' }}>Expires:</span> 
-                        <span style={{ fontWeight: '500', color: '#333' }}>{(!moa.status.includes('Processing') && moa.expiration_date) ? new Date(moa.expiration_date).toLocaleDateString() : 'N/A'}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                      <div style={{ position: 'relative', flex: '1 1 100%' }}>
-                        <button onClick={() => setHistoryPopoverId(historyPopoverId === moa.id ? null : moa.id)} style={{ width: '100%', padding: '10px', background: '#f8f9fa', color: '#0d6efd', border: '1px solid #eee', borderRadius: '8px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
-                          <IconHistory /> History {moaLogs.length > 0 && `(${moaLogs.length})`}
-                        </button>
-                        {historyPopoverId === moa.id && (
-                          <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
-                            <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: '0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
-                            
-                            <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
-                              {moaLogs.map((log, idx, arr) => {
-                                const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
-                                const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
-
-                                return (
-                                  <div key={log.id} style={{ padding: '16px 0', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f0f0f0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                      <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>
-                                        {log.user_email || 'System'}
-                                      </span>
-                                      <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>
-                                        {opLabel}
-                                      </span>
-                                    </div>
-                                    <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
-                                      {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
-                                    </div>
-                                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>
-                                      {renderAuditDetails(log)}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                              {moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}
-                            </div>
-
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => handleView(moa)} style={{ flex: 1, padding: '10px', background: '#f0f7ff', color: '#0d6efd', border: '1px solid #cce5ff', borderRadius: '8px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer' }}>View Details</button>
-                      {!isViewingDeleted ? (
-                        <>
-                          <button onClick={() => handleEdit(moa)} style={{ padding: '10px 14px', background: '#e6f4ea', color: '#1e8e3e', border: '1px solid #cce8d6', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><IconEdit /></button>
-                          <button onClick={() => handleDeleteRestore(moa.id, false)} style={{ padding: '10px 14px', background: '#fce8e6', color: '#d93025', border: '1px solid #f9c2c4', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}><IconTrash /></button>
-                        </>
-                      ) : (
-                        <button onClick={() => handleDeleteRestore(moa.id, true)} style={{ flex: 1, padding: '10px', background: '#e6f4ea', color: '#1e8e3e', border: '1px solid #cce8d6', borderRadius: '8px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><IconRestore /> Restore</button>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-              {sortedMoas.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No records found.</div>}
-            </div>
-
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '24px' }}>
                 <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
@@ -672,12 +514,24 @@ export default function AdminDashboard() {
                         <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '2px' }}>{u.email}</div>
                       </td>
                       <td style={{ padding: '16px 24px', verticalAlign: 'middle' }}>
-                        <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize', color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e', background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea' }}>
-                          {u.role}
-                        </span>
+                        {/* --- NEW INSTANT ROLE DROPDOWN --- */}
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          style={{
+                            padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize',
+                            color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e',
+                            background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea',
+                            border: '1px solid transparent', cursor: 'pointer', outline: 'none'
+                          }}
+                        >
+                          <option value="student">Student</option>
+                          <option value="faculty">Faculty</option>
+                          <option value="admin">Admin</option>
+                        </select>
                       </td>
                       <td style={{ padding: '16px 24px', fontSize: '0.85rem', color: '#555', verticalAlign: 'middle' }}>
-                        {u.role !== 'admin' ? (u.college || 'College of Computing') : '-'}
+                        {u.role !== 'admin' ? (u.college || 'Pending...') : '-'}
                       </td>
                       <td style={{ padding: '16px 24px', textAlign: 'center', verticalAlign: 'middle' }}>
                         {u.role === 'faculty' ? (
@@ -720,9 +574,21 @@ export default function AdminDashboard() {
                   <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '12px' }}>{u.email}</div>
 
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize', color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e', background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea' }}>
-                      {u.role}
-                    </span>
+                    <select
+                      value={u.role}
+                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      style={{
+                        padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize',
+                        color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e',
+                        background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea',
+                        border: '1px solid transparent', cursor: 'pointer', outline: 'none'
+                      }}
+                    >
+                      <option value="student">Student</option>
+                      <option value="faculty">Faculty</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    
                     <span style={{ color: u.is_blocked ? '#dc3545' : '#198754', fontWeight: '600', fontSize: '0.75rem', background: u.is_blocked ? '#fce8e6' : '#e6f4ea', padding: '4px 10px', borderRadius: '12px' }}>
                       {u.is_blocked ? 'Blocked' : 'Active'}
                     </span>
@@ -730,7 +596,7 @@ export default function AdminDashboard() {
 
                   {u.role !== 'admin' && (
                     <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '16px' }}>
-                      College: <span style={{ color: '#333', fontWeight: '500' }}>{u.college || 'College of Computing'}</span>
+                      College: <span style={{ color: '#333', fontWeight: '500' }}>{u.college || 'Pending...'}</span>
                     </div>
                   )}
 
@@ -798,10 +664,9 @@ export default function AdminDashboard() {
               <div style={{ marginBottom: '24px' }}>
                 <FormLabel text="Role" required />
                 <select value={newUserParams.role} onChange={handleAddUserRoleChange} style={{ ...inputStyle, backgroundColor: '#fff' }} required>
-                  <option value="Student">Student</option>
-                  <option value="Faculty">Faculty</option>
-                  <option value="Faculty (Maintainer)">Faculty with maintaining rights</option>
-                  <option value="Admin">Admin</option>
+                  <option value="student">Student</option>
+                  <option value="faculty">Faculty</option>
+                  <option value="admin">Admin</option>
                 </select>
               </div>
               <div style={{ marginBottom: '40px' }}>
@@ -809,8 +674,8 @@ export default function AdminDashboard() {
                 <select
                   value={newUserParams.college}
                   onChange={e => setNewUserParams({ ...newUserParams, college: e.target.value })}
-                  disabled={newUserParams.role === 'Admin'}
-                  style={{ ...inputStyle, backgroundColor: newUserParams.role === 'Admin' ? '#f8f9fa' : '#fff', color: newUserParams.role === 'Admin' ? '#aaa' : '#333' }}
+                  disabled={newUserParams.role === 'admin'}
+                  style={{ ...inputStyle, backgroundColor: newUserParams.role === 'admin' ? '#f8f9fa' : '#fff', color: newUserParams.role === 'admin' ? '#aaa' : '#333' }}
                   required
                 >
                   <option value="" disabled hidden>Please choose a college...</option>
