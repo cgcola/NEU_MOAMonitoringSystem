@@ -27,39 +27,58 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
-  const fetchUserProfile = async (user) => {
-    // Try to find the user in the database
+  // --- NEW: THE GLOBAL MASTER BOUNCER (Real-Time Block Listener) ---
+  useEffect(() => {
+    if (session?.user?.id) {
+      // This listener watches the logged-in user's exact row in the database globally
+      const blockListener = supabase.channel('global-block-watch')
+        .on('postgres_changes', { 
+            event: 'UPDATE', 
+            schema: 'public', 
+            table: 'profiles', 
+            filter: `id=eq.${session.user.id}` 
+          }, async (payload) => {
+            
+          // If the admin clicks block, kick them out instantly from ANY screen
+          if (payload.new && payload.new.is_blocked === true) {
+            alert("Your account has been blocked by an Administrator.");
+            await supabase.auth.signOut();
+            window.location.reload(); 
+          }
+        })
+        .subscribe();
+
+      return () => { supabase.removeChannel(blockListener); }
+    }
+  }, [session])
+
+  const fetchUserProfile = async (user, retries = 3) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, can_maintain')
+      .select('role, can_maintain, is_blocked') // <-- We must fetch is_blocked here
       .eq('id', user.id)
       .single()
 
-    // If they DON'T exist (PGRST116 means "No rows found"), create them!
-    if (error && error.code === 'PGRST116') {
-      console.log("No profile found. Creating a new one...")
-      const newProfile = {
-        id: user.id,
-        email: user.email,
-        role: 'student', // Default role
-        full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-        can_maintain: false,
-        is_blocked: false
+    if (error && error.code === 'PGRST116' && retries > 0) {
+      console.log("Waiting for backend database trigger to finish...")
+      setTimeout(() => fetchUserProfile(user, retries - 1), 500)
+      return
+    }
+
+    if (data) {
+      // --- NEW: Block them at the door if they try to log in while already blocked ---
+      if (data.is_blocked) {
+        alert("Your account is currently blocked. Please contact an Administrator.");
+        await supabase.auth.signOut();
+        window.location.reload();
+        return; // Stop the code here so they never reach a dashboard
       }
 
-      const { error: insertError } = await supabase.from('profiles').insert([newProfile])
-      
-      if (insertError) {
-        console.error("Failed to create profile:", insertError.message)
-      } else {
-        setUserRole('student')
-        setCanMaintain(false)
-      }
-    } 
-    // If they DO exist, set their role
-    else if (!error && data) {
       setUserRole(data.role.toLowerCase())
       setCanMaintain(data.can_maintain || false)
+    } else {
+      setUserRole('student')
+      setCanMaintain(false)
     }
 
     setLoading(false)
