@@ -23,7 +23,28 @@ export default function StudentDashboard() {
 
   const [toast, setToast] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 8
+  // Dynamic Pagination State
+  const [itemsPerPage, setItemsPerPage] = useState(8); // Default to 8
+
+  // Listen for window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth <= 768) {
+        setItemsPerPage(4); // Show 4 cards on mobile phones
+      } else if (window.innerWidth <= 1024) {
+        setItemsPerPage(6); // Show 6 cards on tablets
+      } else {
+        setItemsPerPage(8); // Show 8 cards on desktop
+      }
+    };
+
+    // Run it once on load
+    handleResize();
+
+    // Attach the event listener
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   useEffect(() => { 
     fetchApprovedMOAs(); 

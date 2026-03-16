@@ -41,7 +41,26 @@ export default function AdminDashboard() {
 
   const [currentPage, setCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 6
+  const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 6)
+
+  // Listen for window resize to change how many items fit on the screen
+  useEffect(() => {
+    const handleResize = () => {
+      setItemsPerPage((prevItems) => {
+        const newItems = window.innerWidth <= 768 ? 4 : 6;
+        return newItems; 
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // ONLY reset to page 1 if the layout actually shifted between mobile/desktop
+  useEffect(() => {
+    setCurrentPage(1);
+    setUserCurrentPage(1);
+  }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
   const [newUserParams, setNewUserParams] = useState({ full_name: '', email: '', role: 'Student', college: '' })
