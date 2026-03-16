@@ -85,9 +85,4 @@ npm run dev
 
 ---
 
-<br />
-
-<div align="center">
-  <p><i>Developed by Carl Geneson Ola</i></p>
-  <p><b>Designed and Developed for New Era University</b></p>
-</div>
+**Developed by Carl Geneson Ola** *Designed and Developed for New Era University.*
