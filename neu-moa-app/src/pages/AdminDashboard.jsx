@@ -85,12 +85,29 @@ export default function AdminDashboard() {
     };
   }, [])
   
-  // Triggers the onboarding modal if the current user is missing a college
+  // --- REAL-TIME USER PROTECTION & ONBOARDING ---
   useEffect(() => {
     if (userEmail && users.length > 0) {
       const myProfile = users.find(u => u.email === userEmail);
-      if (myProfile && (!myProfile.college || myProfile.college.trim() === '')) {
-        setShowOnboarding(true);
+      if (myProfile) {
+        
+        // 1. TRUE BLOCKING: If this current user is blocked, kick them out forcibly
+        if (myProfile.is_blocked) {
+          supabase.auth.signOut().then(() => {
+            window.location.reload(); // Returns them to login screen
+          });
+          return;
+        }
+
+        // 2. ONBOARDING: Show modal if college is missing
+        if (!myProfile.college || myProfile.college.trim() === '') {
+          if (myProfile.role === 'admin') {
+            // Auto-assign Admins so they don't get stuck in the modal
+            supabase.from('profiles').update({ college: 'N/A (For Admin)' }).eq('email', userEmail).then(() => fetchData());
+          } else {
+            setShowOnboarding(true);
+          }
+        }
       }
     }
   }, [userEmail, users])
@@ -184,11 +201,16 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 3. FILTER & SORT USERS ---
+  // --- 3. CRASH-PROOF USER FILTER & SORT ---
   const filteredUsers = users.filter(u => {
     const searchLower = userSearchQuery.toLowerCase();
-    const matchesSearch = (u.full_name?.toLowerCase().includes(searchLower)) || (u.email?.toLowerCase().includes(searchLower));
-    const matchesRole = userFilterRole === 'ALL' || (u.role || '').toLowerCase() === userFilterRole.toLowerCase();
+    // Use fallback strings ('') to prevent null errors from crashing the search
+    const safeName = (u.full_name || '').toLowerCase();
+    const safeEmail = (u.email || '').toLowerCase();
+    const safeRole = (u.role || '').toLowerCase();
+
+    const matchesSearch = safeName.includes(searchLower) || safeEmail.includes(searchLower);
+    const matchesRole = userFilterRole === 'ALL' || safeRole === userFilterRole.toLowerCase();
     const matchesStatus = userFilterStatus === 'ALL' || (userFilterStatus === 'BLOCKED' ? u.is_blocked : !u.is_blocked);
     
     return matchesSearch && matchesRole && matchesStatus;
@@ -281,7 +303,12 @@ export default function AdminDashboard() {
 
   const handleUserToggle = async (userId, field, currentVal) => {
     const { error } = await supabase.from('profiles').update({ [field]: !currentVal }).eq('id', userId)
-    if (error) showToast(error.message, 'error'); else { showToast('User updated successfully.'); fetchData(); }
+    if (error) {
+      showToast(error.message, 'error'); 
+    } else { 
+      showToast(`User successfully updated.`, 'success'); 
+      fetchData(); 
+    }
   }
 
   const handleAddUserRoleChange = (e) => {
