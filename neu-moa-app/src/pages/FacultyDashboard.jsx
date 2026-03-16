@@ -31,20 +31,25 @@ export default function FacultyDashboard({ canMaintain }) {
   const [dateTo, setDateTo] = useState('')
   
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
-  
-  // --- PAGINATION STATE ---
+
+  // --- SMART AUTOMATIC PAGINATION ---
   const [currentPage, setCurrentPage] = useState(1)
   
-  const getItemsPerPage = () => window.innerWidth <= 768 ? 4 : 8;
-  const [itemsPerPage, setItemsPerPage] = useState(getItemsPerPage())
+  // The system decides entries based on screen size (Smaller screen = More items = Fewer pages)
+  const getDynamicItemsPerPage = () => {
+    if (window.innerWidth <= 768) return 12; // Mobile
+    if (window.innerWidth <= 1024) return 10; // Tablet
+    return 8; // Desktop Grid
+  };
+  
+  const [itemsPerPage, setItemsPerPage] = useState(getDynamicItemsPerPage())
 
-  // Dynamic Resize Listener
   useEffect(() => {
     const handleResize = () => {
-      const newItems = getItemsPerPage();
+      const newItems = getDynamicItemsPerPage();
       if (newItems !== itemsPerPage) {
         setItemsPerPage(newItems);
-        setCurrentPage(1); 
+        setCurrentPage(1); // Auto-reset to page 1 to prevent getting stuck
       }
     };
     window.addEventListener('resize', handleResize);
@@ -121,14 +126,7 @@ export default function FacultyDashboard({ canMaintain }) {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  const stats = {
-    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
-    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING')).length,
-    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING')).length,
-    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING')).length,
-  }
-
-  // --- 1. FILTER ---
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -141,7 +139,7 @@ export default function FacultyDashboard({ canMaintain }) {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SORT ---
+  // --- 2. SORT MOAS ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; } 
@@ -151,10 +149,16 @@ export default function FacultyDashboard({ canMaintain }) {
     return 0;
   });
 
-  // --- 3. SLICE ---
+  // --- 3. SLICE MOAS (Dynamic calculation) ---
   const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
 
+  const stats = {
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING')).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING')).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING')).length,
+  }
 
   const handleAddNew = async () => {
     const currentYear = new Date().getFullYear()
@@ -395,9 +399,9 @@ export default function FacultyDashboard({ canMaintain }) {
 
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '24px' }}>
-                <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
                 <span style={{ fontSize: '0.9rem', color: '#555', fontWeight: '500' }}>Page <strong style={{ color: '#0d6efd' }}>{currentPage}</strong> of {totalPages}</span>
-                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === totalPages ? '#f5f5f5' : 'transparent', color: currentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === totalPages ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === totalPages ? '#f5f5f5' : 'transparent', color: currentPage === totalPages ? '#999' : 'var(--neu-blue)', cursor: currentPage === totalPages ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Next</button>
               </div>
             )}
           </div>
@@ -491,7 +495,7 @@ export default function FacultyDashboard({ canMaintain }) {
               <div style={{ width: '64px', height: '64px', background: '#f0f7ff', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><IconBuildingBlue /></div>
               <div><h2 style={{ fontSize: '1.4rem', margin: '0 0 4px 0', color: '#00204a' }}>{selectedMoa.company_name}</h2><p style={{ color: '#888', margin: 0, fontSize: '0.9rem' }}>HTE ID: {selectedMoa.hte_id}</p></div>
             </div>
-            
+
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '24px', textTransform: 'uppercase', fontWeight: '600' }}>Contact Information</h4>
             <div className="form-grid">
               <div style={{ minWidth: 0 }}>

@@ -6,7 +6,7 @@ import { formatName, renderBadge, renderAuditDetails } from '../utils/helpers'
 import Header from '../components/Header'
 import Toast from '../components/Toast'
 import ConfirmModal from '../components/ConfirmModal'
-import { IconCheckCircle, IconClock, IconXCircle, IconAlertCircle, IconHistory, IconEye, IconEdit, IconTrash, IconRestore, IconUser, IconLocation, IconUserGrey, IconMail, IconDocGrey, IconBuildingGrey, IconCalendar, IconBuildingBlue, IconShield, IconBlock } from '../components/Icons'
+import { IconCheckCircle, IconClock, IconXCircle, IconAlertCircle, IconHistory, IconEye, IconEdit, IconTrash, IconRestore, IconUser, IconLocation, IconUserGrey, IconMail, IconDocGrey, IconBuildingGrey, IconCalendar, IconBuildingBlue } from '../components/Icons'
 
 export default function AdminDashboard() {
   const [moas, setMoas] = useState([])
@@ -39,20 +39,25 @@ export default function AdminDashboard() {
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [userSortConfig, setUserSortConfig] = useState({ key: 'full_name', direction: 'asc' })
 
-  // --- PAGINATION STATE ---
+  // --- SMART AUTOMATIC PAGINATION ---
   const [currentPage, setCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
   
-  const getItemsPerPage = () => window.innerWidth <= 768 ? 4 : 6;
-  const [itemsPerPage, setItemsPerPage] = useState(getItemsPerPage())
+  // The system decides entries based on screen size (Smaller screen = More items = Fewer pages)
+  const getDynamicItemsPerPage = () => {
+    if (window.innerWidth <= 768) return 12; // Mobile
+    if (window.innerWidth <= 1024) return 9; // Tablet
+    return 6; // Desktop Grid
+  };
+  
+  const [itemsPerPage, setItemsPerPage] = useState(getDynamicItemsPerPage())
 
-  // Dynamic Resize Listener
   useEffect(() => {
     const handleResize = () => {
-      const newItems = getItemsPerPage();
+      const newItems = getDynamicItemsPerPage();
       if (newItems !== itemsPerPage) {
         setItemsPerPage(newItems);
-        setCurrentPage(1);
+        setCurrentPage(1); // Auto-reset to page 1 to prevent getting stuck
         setUserCurrentPage(1);
       }
     };
@@ -132,14 +137,7 @@ export default function AdminDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  const stats = {
-    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
-    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING') && !m.deleted_at).length,
-    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
-    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
-  }
-
-  // --- 1. FILTER ---
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -152,7 +150,7 @@ export default function AdminDashboard() {
       matchesDateRange && ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SORT ---
+  // --- 2. SORT MOAS ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; }
@@ -162,6 +160,11 @@ export default function AdminDashboard() {
     return 0;
   });
 
+  // --- 3. SLICE MOAS (PAGINATION) ---
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
+  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
+
+  // --- 4. SORT USERS ---
   const sortedUsers = [...users.filter(u => u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.role?.toLowerCase().includes(userSearchQuery.toLowerCase()))].sort((a, b) => {
     let aVal = userSortConfig.key === 'full_name' ? (a.full_name || a.email.split('@')[0]).toLowerCase() : (a[userSortConfig.key] || '').toLowerCase();
     let bVal = userSortConfig.key === 'full_name' ? (b.full_name || b.email.split('@')[0]).toLowerCase() : (b[userSortConfig.key] || '').toLowerCase();
@@ -170,13 +173,16 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 3. SLICE ---
-  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
-  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
-
+  // --- 5. SLICE USERS (PAGINATION) ---
   const paginatedUsers = sortedUsers.slice((userCurrentPage - 1) * itemsPerPage, ((userCurrentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalUserPages = Math.ceil(sortedUsers.length / itemsPerPage)
 
+  const stats = {
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING') && !m.deleted_at).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
+  }
 
   const handleView = (moa) => { setSelectedMoa(moa); setCurrentView('details') }
 
@@ -268,7 +274,7 @@ export default function AdminDashboard() {
     if (error) {
       showToast(error.message, 'error');
     } else {
-      showToast(`Success! When ${newUserParams.email} logs in with Google, they will be assigned as ${newUserParams.role}.`, 'success');
+      showToast(`Success! When ${newUserParams.email} logs in, they will be assigned as ${newUserParams.role}.`, 'success');
       setCurrentView('users');
       setNewUserParams({ full_name: '', email: '', role: 'Student', college: '' });
     }
@@ -328,7 +334,6 @@ export default function AdminDashboard() {
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
-
             </div>
 
             {showFilters && (
@@ -347,7 +352,6 @@ export default function AdminDashboard() {
                     <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #ddd', outline: 'none', backgroundColor: '#fff', color: dateTo ? '#333' : '#aaa', boxSizing: 'border-box' }} />
                   </div>
                 </div>
-
                 {hasActiveFilters && (
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #eaeaea' }}>
                     <button onClick={clearFilters} style={{ background: 'none', border: 'none', color: '#666', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600' }}>✕ Clear Filters</button>
@@ -389,34 +393,23 @@ export default function AdminDashboard() {
                               {historyPopoverId === moa.id && (
                                 <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: '0', background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', width: '340px', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
                                   <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
-                                  
                                   <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
                                     {moaLogs.map((log, idx, arr) => {
                                       const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
                                       const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
-
                                       return (
                                         <div key={log.id} style={{ padding: '16px 0', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f0f0f0' }}>
                                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                            <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>
-                                              {log.user_email || 'System'}
-                                            </span>
-                                            <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>
-                                              {opLabel}
-                                            </span>
+                                            <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>{log.user_email || 'System'}</span>
+                                            <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>{opLabel}</span>
                                           </div>
-                                          <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
-                                            {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
-                                          </div>
-                                          <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>
-                                            {renderAuditDetails(log)}
-                                          </div>
+                                          <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}</div>
+                                          <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>{renderAuditDetails(log)}</div>
                                         </div>
                                       );
                                     })}
                                     {moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}
                                   </div>
-
                                 </div>
                               )}
                             </div>
@@ -437,16 +430,11 @@ export default function AdminDashboard() {
                 const moaLogs = logs.filter(l => String(l.moa_id) === String(moa.id));
                 return (
                   <div key={moa.id} style={{ background: isViewingDeleted ? '#fdf5f5' : '#fff', border: '1px solid #eee', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-
                     <div style={{ marginBottom: '20px' }}>
                       <h3 style={{ margin: '0 0 12px 0', fontSize: '1.15rem', color: '#00204a', fontWeight: '700', lineHeight: '1.3' }}>{moa.company_name}</h3>
-                      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-                        {renderBadge(moa.status)}
-                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>{renderBadge(moa.status)}</div>
                     </div>
-
                     <p style={{ margin: '0 0 16px 0', fontSize: '0.8rem', color: '#888' }}>{moa.hte_id}</p>
-
                     <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                       <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: '#999', minWidth: '65px' }}>Industry:</span> <span style={{ fontWeight: '500', color: '#333' }}>{moa.industry_type?.split('/')[0]}</span></div>
                       <div style={{ display: 'flex', gap: '8px' }}><span style={{ color: '#999', minWidth: '65px' }}>College:</span> <span style={{ fontWeight: '500', color: '#333' }}>{moa.endorsed_by_college?.replace('College of ', '')}</span></div>
@@ -455,7 +443,6 @@ export default function AdminDashboard() {
                         <span style={{ fontWeight: '500', color: '#333' }}>{(!moa.status.includes('Processing') && moa.expiration_date) ? new Date(moa.expiration_date).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </div>
-
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                       <div style={{ position: 'relative', flex: '1 1 100%' }}>
                         <button onClick={() => setHistoryPopoverId(historyPopoverId === moa.id ? null : moa.id)} style={{ width: '100%', padding: '10px', background: '#f8f9fa', color: '#0d6efd', border: '1px solid #eee', borderRadius: '8px', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6px' }}>
@@ -464,34 +451,23 @@ export default function AdminDashboard() {
                         {historyPopoverId === moa.id && (
                           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
                             <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: '0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
-                            
                             <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
                               {moaLogs.map((log, idx, arr) => {
                                 const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
                                 const theme = opLabel === 'INSERT' ? { bg: '#e6f4ea', text: '#1e8e3e' } : opLabel === 'EDIT' ? { bg: '#e6f0fa', text: '#0d6efd' } : { bg: '#fce8e6', text: '#dc3545' };
-
                                 return (
                                   <div key={log.id} style={{ padding: '16px 0', borderBottom: idx === arr.length - 1 ? 'none' : '1px solid #f0f0f0' }}>
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                                      <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>
-                                        {log.user_email || 'System'}
-                                      </span>
-                                      <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>
-                                        {opLabel}
-                                      </span>
+                                      <span style={{ fontWeight: '600', fontSize: '0.85rem', color: '#333' }}>{log.user_email || 'System'}</span>
+                                      <span style={{ fontSize: '0.65rem', fontWeight: '700', padding: '3px 8px', borderRadius: '4px', background: theme.bg, color: theme.text }}>{opLabel}</span>
                                     </div>
-                                    <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>
-                                      {new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}
-                                    </div>
-                                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>
-                                      {renderAuditDetails(log)}
-                                    </div>
+                                    <div style={{ textAlign: 'right', fontSize: '0.75rem', color: '#888', marginBottom: '4px' }}>{new Date(log.changed_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'medium' })}</div>
+                                    <div style={{ textAlign: 'right', fontSize: '0.85rem', color: '#555' }}>{renderAuditDetails(log)}</div>
                                   </div>
                                 );
                               })}
                               {moaLogs.length === 0 && <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '0.85rem' }}>No history found.</div>}
                             </div>
-
                           </div>
                         )}
                       </div>
@@ -533,7 +509,6 @@ export default function AdminDashboard() {
                 <h1 style={{ fontSize: '1.75rem', fontWeight: '700', marginBottom: '8px', color: '#00204a' }}>User Management</h1>
                 <p style={{ color: '#666', margin: 0, fontSize: '0.95rem' }}>Manage user accounts, roles, and permissions</p>
               </div>
-              
               <button onClick={() => setCurrentView('userForm')} style={{ flex: '0 0 auto', background: '#0d6efd', color: '#fff', border: 'none', padding: '12px 20px', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="17" y1="11" x2="23" y2="11"></line></svg>
                  <span className="desktop-only-flex">Add User</span>
@@ -608,26 +583,19 @@ export default function AdminDashboard() {
                 <div key={u.id} style={{ border: '1px solid #eee', borderRadius: '12px', padding: '16px', background: u.is_blocked ? '#fff5f5' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                   <div style={{ fontWeight: '700', color: '#00204a', fontSize: '1.05rem', marginBottom: '2px' }}>{u.full_name || u.email.split('@')[0]}</div>
                   <div style={{ fontSize: '0.8rem', color: '#888', marginBottom: '12px' }}>{u.email}</div>
-
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-                    <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize', color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e', background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea' }}>
-                      {u.role}
-                    </span>
-                    <span style={{ color: u.is_blocked ? '#dc3545' : '#198754', fontWeight: '600', fontSize: '0.75rem', background: u.is_blocked ? '#fce8e6' : '#e6f4ea', padding: '4px 10px', borderRadius: '12px' }}>
-                      {u.is_blocked ? 'Blocked' : 'Active'}
-                    </span>
+                    <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize', color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e', background: u.role === 'admin' ? '#f3e8ff' : u.role === 'faculty' ? '#e6f0fa' : '#e6f4ea' }}>{u.role}</span>
+                    <span style={{ color: u.is_blocked ? '#dc3545' : '#198754', fontWeight: '600', fontSize: '0.75rem', background: u.is_blocked ? '#fce8e6' : '#e6f4ea', padding: '4px 10px', borderRadius: '12px' }}>{u.is_blocked ? 'Blocked' : 'Active'}</span>
                   </div>
-
                   {u.role !== 'admin' && (
                     <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '16px' }}>
                       College: <span style={{ color: '#333', fontWeight: '500' }}>{u.college || 'College of Computing'}</span>
                     </div>
                   )}
-
                   <div style={{ display: 'flex', gap: '8px' }}>
                     {u.role === 'faculty' && (
                       <button onClick={() => handleUserToggle(u.id, 'can_maintain', u.can_maintain)} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.85rem', cursor: 'pointer', color: u.can_maintain ? '#1e8e3e' : '#555', background: u.can_maintain ? '#e6f4ea' : '#f8f9fa' }}>
-                        {u.can_maintain ? 'Remove MOA Rights' : 'Grant MOA Rights'}
+                        {u.can_maintain ? 'Remove Rights' : 'Grant Rights'}
                       </button>
                     )}
                     {u.role !== 'admin' && (
@@ -640,7 +608,6 @@ export default function AdminDashboard() {
               ))}
               {sortedUsers.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No users found.</div>}
             </div>
-
           </div>
 
           {totalUserPages > 1 && (

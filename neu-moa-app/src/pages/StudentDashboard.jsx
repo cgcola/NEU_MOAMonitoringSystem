@@ -23,19 +23,24 @@ export default function StudentDashboard() {
 
   const [toast, setToast] = useState(null)
   
-  // --- PAGINATION STATE ---
+  // --- SMART AUTOMATIC PAGINATION ---
   const [currentPage, setCurrentPage] = useState(1)
   
-  const getItemsPerPage = () => window.innerWidth <= 768 ? 4 : 8;
-  const [itemsPerPage, setItemsPerPage] = useState(getItemsPerPage())
+  // The system decides entries based on screen size (Smaller screen = More items = Fewer pages)
+  const getDynamicItemsPerPage = () => {
+    if (window.innerWidth <= 768) return 12; // Mobile
+    if (window.innerWidth <= 1024) return 10; // Tablet
+    return 8; // Desktop Grid
+  };
+  
+  const [itemsPerPage, setItemsPerPage] = useState(getDynamicItemsPerPage())
 
-  // Dynamic Resize Listener
   useEffect(() => {
     const handleResize = () => {
-      const newItems = getItemsPerPage();
+      const newItems = getDynamicItemsPerPage();
       if (newItems !== itemsPerPage) {
         setItemsPerPage(newItems);
-        setCurrentPage(1);
+        setCurrentPage(1); // Auto-reset to page 1 to prevent getting stuck
       }
     };
     window.addEventListener('resize', handleResize);
@@ -98,7 +103,7 @@ export default function StudentDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // --- 1. FILTER ---
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     const searchLower = searchQuery.toLowerCase()
     return (filterCollege === 'ALL' || m.endorsed_by_college === filterCollege) &&
@@ -106,10 +111,9 @@ export default function StudentDashboard() {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SLICE ---
+  // --- 2. SLICE MOAS (Dynamic calculation) ---
   const currentMoas = filteredMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalPages = Math.ceil(filteredMoas.length / itemsPerPage)
-
 
   if (loading) return <p style={{ textAlign: 'center', padding: '50px' }}>Loading Student Workspace...</p>
 
@@ -179,10 +183,11 @@ export default function StudentDashboard() {
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
               
-              {/* Filter Button */}
+              {/* Filter Button - Uses CSS class for responsive stretching */}
               <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
+                
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
 
