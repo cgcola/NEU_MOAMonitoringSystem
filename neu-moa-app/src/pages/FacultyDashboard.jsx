@@ -32,10 +32,8 @@ export default function FacultyDashboard({ canMaintain }) {
   
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
 
-  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
   
-  // Strictly 4 items on mobile, 8 items on desktop
   const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
@@ -43,7 +41,7 @@ export default function FacultyDashboard({ canMaintain }) {
       const newLimit = window.innerWidth <= 768 ? 4 : 8;
       if (newLimit !== itemsPerPage) {
         setItemsPerPage(newLimit);
-        setCurrentPage(1); // Reset page on layout shift
+        setCurrentPage(1);
       }
     };
     window.addEventListener('resize', handleResize);
@@ -120,7 +118,7 @@ export default function FacultyDashboard({ canMaintain }) {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // --- 1. FILTER MOAS ---
+  // FILTER MOAS
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -133,7 +131,7 @@ export default function FacultyDashboard({ canMaintain }) {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SORT MOAS ---
+  // SORT MOAS
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; } 
@@ -143,7 +141,7 @@ export default function FacultyDashboard({ canMaintain }) {
     return 0;
   });
 
-  // --- 3. SLICE ---
+  // SLICE
   const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
   const totalPages = Math.max(1, Math.ceil(sortedMoas.length / itemsPerPage))
 

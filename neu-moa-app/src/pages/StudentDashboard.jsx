@@ -24,14 +24,11 @@ export default function StudentDashboard() {
 
   const [toast, setToast] = useState(null)
   
-  // ONBOARDING Modal States
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [selectedCollege, setSelectedCollege] = useState('')
   
-  // --- STANDARD PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
   
-  // Strictly 4 items on mobile, 8 items on desktop
   const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 8)
 
   useEffect(() => {
@@ -62,9 +59,9 @@ export default function StudentDashboard() {
     };
   }, [])
   
-  // --- REAL-TIME USER PROTECTION & ONBOARDING ---
+  // REAL-TIME USER PROTECTION & ONBOARDING
   useEffect(() => {
-    if (userEmail && userId) { // <--- Wait until we have BOTH the email and the ID
+    if (userEmail && userId) {
       checkMyProfile(); 
 
       // Listen for updates across the whole table, but only react if the ID matches THIS user
@@ -85,13 +82,13 @@ export default function StudentDashboard() {
     const { data: myProfile } = await supabase.from('profiles').select('*').eq('email', userEmail).single();
     
     if (myProfile) {
-      // 1. TRUE BLOCKING: Eject user instantly
+      // TRUE BLOCKING: Eject user instantly
       if (myProfile.is_blocked) {
         await supabase.auth.signOut();
         window.location.reload(); // Throws them back to login page
         return;
       }
-      // 2. ONBOARDING: Show modal if college is missing
+      // ONBOARDING: Show modal if college is missing
       if (!myProfile.college || myProfile.college.trim() === '') {
         setShowOnboarding(true);
       } else {
@@ -155,7 +152,7 @@ export default function StudentDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // --- 1. FILTER MOAS ---
+  // FILTER MOAS
   const filteredMoas = moas.filter(m => {
     const searchLower = searchQuery.toLowerCase()
     return (filterCollege === 'ALL' || m.endorsed_by_college === filterCollege) &&
@@ -163,7 +160,7 @@ export default function StudentDashboard() {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // --- 2. SLICE MOAS ---
+  // SLICE MOAS
   const currentMoas = filteredMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
   const totalPages = Math.max(1, Math.ceil(filteredMoas.length / itemsPerPage))
 

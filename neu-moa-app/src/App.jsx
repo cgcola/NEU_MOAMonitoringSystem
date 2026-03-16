@@ -10,6 +10,10 @@ export default function App() {
   const [userRole, setUserRole] = useState(null)
   const [canMaintain, setCanMaintain] = useState(false)
   const [loading, setLoading] = useState(true)
+  
+  // --- NEW: UI States for Blocking ---
+  const [isBlockedUI, setIsBlockedUI] = useState(false)
+  const [blockMessage, setBlockMessage] = useState('')
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -20,17 +24,16 @@ export default function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
-      if (session) fetchUserProfile(session.user)
-      else { setUserRole(null); setLoading(false) }
+      if (session && !isBlockedUI) fetchUserProfile(session.user)
+      else if (!session && !isBlockedUI) { setUserRole(null); setLoading(false) }
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [isBlockedUI])
 
-  // --- NEW: THE GLOBAL MASTER BOUNCER (Real-Time Block Listener) ---
+  // (Real-Time Block Listener)
   useEffect(() => {
     if (session?.user?.id) {
-      // This listener watches the logged-in user's exact row in the database globally
       const blockListener = supabase.channel('global-block-watch')
         .on('postgres_changes', { 
             event: 'UPDATE', 
@@ -39,11 +42,11 @@ export default function App() {
             filter: `id=eq.${session.user.id}` 
           }, async (payload) => {
             
-          // If the admin clicks block, kick them out instantly from ANY screen
+          // If the admin clicks block, switch to the Blocked UI instantly
           if (payload.new && payload.new.is_blocked === true) {
-            alert("Your account has been blocked by an Administrator.");
-            await supabase.auth.signOut();
-            window.location.reload(); 
+            setBlockMessage("Your account has been suspended by an Administrator while you were active.");
+            setIsBlockedUI(true);
+            await supabase.auth.signOut(); // Silently kill their session in the background
           }
         })
         .subscribe();
@@ -55,7 +58,7 @@ export default function App() {
   const fetchUserProfile = async (user, retries = 3) => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('role, can_maintain, is_blocked') // <-- We must fetch is_blocked here
+      .select('role, can_maintain, is_blocked') 
       .eq('id', user.id)
       .single()
 
@@ -66,12 +69,13 @@ export default function App() {
     }
 
     if (data) {
-      // --- NEW: Block them at the door if they try to log in while already blocked ---
+      // Check at the door: If they log in while blocked, show the UI
       if (data.is_blocked) {
-        alert("Your account is currently blocked. Please contact an Administrator.");
-        await supabase.auth.signOut();
-        window.location.reload();
-        return; // Stop the code here so they never reach a dashboard
+        setBlockMessage("Your access to the NEU MOA Monitoring System has been revoked. Please contact an Administrator if you believe this is a mistake.");
+        setIsBlockedUI(true);
+        setLoading(false);
+        await supabase.auth.signOut(); // Kill the invalid session
+        return; 
       }
 
       setUserRole(data.role.toLowerCase())
@@ -84,7 +88,39 @@ export default function App() {
     setLoading(false)
   }
 
-  if (loading) return <div style={{ textAlign: 'center', marginTop: '100px' }}>Loading...</div>
+  if (loading) return <div style={{ textAlign: 'center', marginTop: '100px', color: '#666', fontFamily: 'system-ui, sans-serif' }}>Loading Workspace...</div>
+  
+  // If they are blocked, ONLY show this restricted screen
+  if (isBlockedUI) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8f9fa', fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
+        <div style={{ background: '#fff', padding: '48px 40px', borderRadius: '16px', maxWidth: '450px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', borderTop: '6px solid #dc3545', animation: 'fadeIn 0.4s ease' }}>
+          
+          <div style={{ width: '80px', height: '80px', background: '#fce8e6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              <line x1="12" y1="15" x2="12" y2="18"></line>
+            </svg>
+          </div>
+          
+          <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111', margin: '0 0 16px 0', letterSpacing: '-0.5px' }}>Access Denied</h1>
+          <p style={{ color: '#555', fontSize: '1rem', lineHeight: '1.5', margin: '0 0 32px 0' }}>{blockMessage}</p>
+          
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{ width: '100%', padding: '14px', background: '#f0f0f0', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s' }}
+            onMouseOver={e => e.currentTarget.style.background = '#e4e4e4'}
+            onMouseOut={e => e.currentTarget.style.background = '#f0f0f0'}
+          >
+            Return to Login
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // Normal App Routing
   if (!session) return <Login />
 
   if (userRole === 'admin') return <AdminDashboard />
