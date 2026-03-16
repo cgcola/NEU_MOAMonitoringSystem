@@ -28,7 +28,6 @@ export default function AnimatedBackground() {
         `}
       </style>
 
-      {/* Dialed the opacity way down to 0.15 and softened the blur */}
       <div style={{ position: 'absolute', top: '-10%', left: '-5%', width: '45vw', height: '45vw', background: '#0ea5e9', borderRadius: '50%', filter: 'blur(120px)', opacity: 0.15, animation: 'float1 18s ease-in-out infinite' }} />
       
       <div style={{ position: 'absolute', bottom: '-20%', right: '-10%', width: '55vw', height: '55vw', background: '#1d4ed8', borderRadius: '50%', filter: 'blur(140px)', opacity: 0.15, animation: 'float2 20s ease-in-out infinite' }} />

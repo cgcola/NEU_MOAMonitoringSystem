@@ -573,7 +573,7 @@ export default function AdminDashboard() {
               </table>
             </div>
 
-            {/* MOBILE USER CARDS */}
+            {/* Mobile User Cards */}
             <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
               {paginatedUsers.map(u => (
                 <div key={u.id} style={{ border: '1px solid #eee', borderRadius: '12px', padding: '16px', background: u.is_blocked ? '#fff5f5' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
@@ -810,7 +810,7 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* FIXED: Cleaner Card-Based Audit Trail for View Details */}
+            {/* Cleaner Card-Based Audit Trail for View Details */}
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: '600', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Audit Trail

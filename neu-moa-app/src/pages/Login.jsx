@@ -36,10 +36,6 @@ export default function Login() {
       overflow: 'hidden',
       fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif"
     }}>
-      
-      {/* We use the single, reusable background component here! 
-        This is the exact same one used in all the dashboards.
-      */}
       <AnimatedBackground />
 
       {/* Main Login Card */}

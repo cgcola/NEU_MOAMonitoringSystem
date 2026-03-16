@@ -135,8 +135,6 @@ export default function StudentDashboard() {
           </div>
 
           <div className="dashboard-card" style={{ padding: '24px', marginBottom: '32px' }}>
-            
-            {/* Replace your Search & Filter div with this in ALL dashboards */}
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
               
               {/* Search Bar */}
@@ -148,8 +146,6 @@ export default function StudentDashboard() {
               {/* Filter Button - Uses CSS class for responsive stretching */}
               <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
-                
-                {/* desktop-only class hides the word on mobile so icon auto-centers */}
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
                 
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}

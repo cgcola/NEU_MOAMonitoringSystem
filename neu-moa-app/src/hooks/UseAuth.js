@@ -19,7 +19,7 @@ export function useAuth() {
       if (metadata) {
         setUserAvatar(metadata.avatar_url || metadata.picture || '');
         const rawName = metadata.full_name || metadata.name || '';
-        // Uses your helper function to format "LastName, FirstName" correctly
+        // Uses helper function to format "LastName, FirstName" correctly
         setUserName(formatName(rawName)); 
       }
     }

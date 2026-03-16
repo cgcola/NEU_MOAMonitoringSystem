@@ -24,8 +24,8 @@ export default function Header({ role, userName, userEmail, userAvatar, handleSi
   };
 
   const triggerSignOut = () => {
-    setIsMenuOpen(false); // Close the dropdown menu
-    setShowSignOutConfirm(true); // Open the custom modal
+    setIsMenuOpen(false);
+    setShowSignOutConfirm(true); 
   };
 
   return (
@@ -80,12 +80,10 @@ export default function Header({ role, userName, userEmail, userAvatar, handleSi
         </div>
       </div>
 
-      {/* FIXED: Custom Sign Out Confirmation Modal to match the Delete UI perfectly */}
       {showSignOutConfirm && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: '20px' }}>
           <div style={{ background: '#fff', padding: '32px 24px', borderRadius: '16px', width: '100%', maxWidth: '380px', boxShadow: '0 10px 25px rgba(0,0,0,0.2)', textAlign: 'center', animation: 'fadeIn 0.2s ease' }}>
             
-            {/* Soft Red Circular Icon Container */}
             <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fce8e6', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px auto' }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
@@ -100,7 +98,6 @@ export default function Header({ role, userName, userEmail, userAvatar, handleSi
               Are you sure you want to sign out? You will need to sign in again to access the dashboard.
             </p>
             
-            {/* Equal Width Side-by-Side Buttons */}
             <div style={{ display: 'flex', gap: '12px' }}>
               <button onClick={() => setShowSignOutConfirm(false)} style={{ flex: 1, padding: '12px 0', background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#444', fontSize: '0.95rem' }}>
                 Cancel

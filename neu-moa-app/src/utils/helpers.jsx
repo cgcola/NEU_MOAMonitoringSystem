@@ -1,4 +1,4 @@
-// 1. Smart Name Formatter 
+// Smart Name Formatter 
 export const formatName = (rawName) => {
   if (!rawName) return '';
   const properCase = (str) => str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
@@ -12,7 +12,7 @@ export const formatName = (rawName) => {
   return properCase(formattedName);
 };
 
-// 2. Reusable Status Badge
+// Reusable Status Badge
 export const renderBadge = (statusStr) => {
   if (!statusStr) return null;
   const isApproved = statusStr.toUpperCase().includes('APPROVED');
@@ -52,8 +52,8 @@ export const renderBadge = (statusStr) => {
       fontWeight: '600', 
       textAlign: 'center', 
       lineHeight: '1.4', 
-      whiteSpace: 'normal',       // FIXED: Allows wrapping
-      wordBreak: 'break-word',    // FIXED: Prevents overflowing containers
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
       maxWidth: '100%' 
     }}>
       {text1} {text2 && <><br/><span style={{ fontWeight: '500' }}>- {text2}</span></>}
@@ -61,7 +61,7 @@ export const renderBadge = (statusStr) => {
   );
 };
 
-// 3. Audit Trail Renderer
+// Audit Trail Renderer
 export const renderAuditDetails = (log) => {
   if (log.operation === 'INSERT') return <span>Initial creation</span>;
   if (log.operation === 'DELETE') return <span style={{ color: '#dc3545' }}>Moved record to trash</span>;

@@ -9,7 +9,7 @@ export function useMoas(role = 'admin', canMaintain = false) {
   const fetchMoas = useCallback(async () => {
     setLoadingMoas(true);
     
-    // 1. Build the dynamic query based on the user's role
+    // Build the dynamic query based on the user's role
     let query = supabase.from('moas').select('*').order('created_at', { ascending: false });
     
     if (role === 'student') {
@@ -30,7 +30,7 @@ export function useMoas(role = 'admin', canMaintain = false) {
       return;
     }
 
-    // 2. Smart DB Auto-Cleanup & Expiration Check
+    // Smart DB Auto-Cleanup & Expiration Check
     const today = new Date();
     today.setHours(0, 0, 0, 0); 
     const twoMonthsFromNow = new Date(today);
@@ -68,7 +68,7 @@ export function useMoas(role = 'admin', canMaintain = false) {
         }
       }
 
-      // 3. If data was fixed automatically, sync to Supabase silently
+      // If data was fixed automatically, sync to Supabase silently
       if (dbNeedsUpdate && canUpdateDB) {
         supabase.from('moas').update({ 
           status: updatedMoa.status, 
