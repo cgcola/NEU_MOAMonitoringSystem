@@ -39,27 +39,25 @@ export default function AdminDashboard() {
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [userSortConfig, setUserSortConfig] = useState({ key: 'full_name', direction: 'asc' })
 
+  // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
   const [userCurrentPage, setUserCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(window.innerWidth <= 768 ? 4 : 6)
+  
+  const getItemsPerPage = () => window.innerWidth <= 768 ? 4 : 6;
+  const [itemsPerPage, setItemsPerPage] = useState(getItemsPerPage())
 
-  // Listen for window resize to change how many items fit on the screen
+  // Dynamic Resize Listener
   useEffect(() => {
     const handleResize = () => {
-      setItemsPerPage((prevItems) => {
-        const newItems = window.innerWidth <= 768 ? 4 : 6;
-        return newItems; 
-      });
+      const newItems = getItemsPerPage();
+      if (newItems !== itemsPerPage) {
+        setItemsPerPage(newItems);
+        setCurrentPage(1);
+        setUserCurrentPage(1);
+      }
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // ONLY reset to page 1 if the layout actually shifted between mobile/desktop
-  useEffect(() => {
-    setCurrentPage(1);
-    setUserCurrentPage(1);
   }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
@@ -69,7 +67,6 @@ export default function AdminDashboard() {
     fetchData(); 
     getUserData(); 
 
-    // Listen to moas, profiles, and audit_logs tables on a single channel
     const adminChannel = supabase.channel('admin-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => fetchData())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => fetchData())
@@ -135,6 +132,14 @@ export default function AdminDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
+  const stats = {
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING') && !m.deleted_at).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
+  }
+
+  // --- 1. FILTER ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -147,6 +152,7 @@ export default function AdminDashboard() {
       matchesDateRange && ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
+  // --- 2. SORT ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; }
@@ -156,9 +162,6 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
-  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
-
   const sortedUsers = [...users.filter(u => u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.role?.toLowerCase().includes(userSearchQuery.toLowerCase()))].sort((a, b) => {
     let aVal = userSortConfig.key === 'full_name' ? (a.full_name || a.email.split('@')[0]).toLowerCase() : (a[userSortConfig.key] || '').toLowerCase();
     let bVal = userSortConfig.key === 'full_name' ? (b.full_name || b.email.split('@')[0]).toLowerCase() : (b[userSortConfig.key] || '').toLowerCase();
@@ -167,15 +170,13 @@ export default function AdminDashboard() {
     return 0;
   });
 
+  // --- 3. SLICE ---
+  const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
+  const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
+
   const paginatedUsers = sortedUsers.slice((userCurrentPage - 1) * itemsPerPage, ((userCurrentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalUserPages = Math.ceil(sortedUsers.length / itemsPerPage)
 
-  const stats = {
-    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED') && !m.deleted_at).length,
-    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING') && !m.deleted_at).length,
-    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
-    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING') && !m.deleted_at).length,
-  }
 
   const handleView = (moa) => { setSelectedMoa(moa); setCurrentView('details') }
 
@@ -256,8 +257,6 @@ export default function AdminDashboard() {
 
   const handleAddUserSubmit = async (e) => {
     e.preventDefault();
-    
-    // Insert the user into the database's Waiting List
     const { error } = await supabase
       .from('pending_roles')
       .upsert([{ 
@@ -319,13 +318,11 @@ export default function AdminDashboard() {
           <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: showFilters ? '20px' : '0' }}>
               
-              {/* Search Bar */}
               <div style={{ flex: '1 1 250px', minWidth: '250px', position: 'relative' }}>
                 <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search by company name, contact person, or address..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
               
-              {/* Filter Button */}
               <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
@@ -393,7 +390,6 @@ export default function AdminDashboard() {
                                 <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: '0', background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', width: '340px', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
                                   <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: 0, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
                                   
-                                  {/* FIXED: Display full string (no split) */}
                                   <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
                                     {moaLogs.map((log, idx, arr) => {
                                       const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
@@ -469,7 +465,6 @@ export default function AdminDashboard() {
                           <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #eaeaea', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.15)', padding: '0', zIndex: 999, textAlign: 'left', overflow: 'hidden' }}>
                             <div style={{ padding: '12px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa' }}><h4 style={{ margin: '0', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '6px' }}><IconHistory /> Audit Trail</h4><button onClick={() => setHistoryPopoverId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>✕</button></div>
                             
-                            {/* FIXED: Display full string (no split) */}
                             <div style={{ maxHeight: '300px', overflowY: 'auto', padding: '0 16px' }}>
                               {moaLogs.map((log, idx, arr) => {
                                 const opLabel = log.operation === 'UPDATE' ? 'EDIT' : log.operation;
@@ -826,7 +821,6 @@ export default function AdminDashboard() {
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '24px', textTransform: 'uppercase', fontWeight: '600', marginTop: '32px' }}>MOA Information</h4>
             <div className="form-grid">
               
-              {/* Left Column (Stacks first on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconDocGrey /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Industry Type</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{selectedMoa.industry_type}</p>
@@ -834,7 +828,6 @@ export default function AdminDashboard() {
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 0 24px' }}>{selectedMoa.endorsed_by_college}</p>
               </div>
               
-              {/* Right Column (Stacks second on mobile) */}
               <div style={{ minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}><IconCalendar /> <span style={{ color: '#888', fontSize: '0.85rem' }}>Effective Date</span></div>
                 <p style={{ color: '#333', fontSize: '0.95rem', margin: '0 0 24px 24px' }}>{(!selectedMoa.status.includes('Processing') && selectedMoa.effective_date) ? new Date(selectedMoa.effective_date).toLocaleDateString() : 'N/A'}</p>
@@ -844,7 +837,6 @@ export default function AdminDashboard() {
 
             </div>
 
-            {/* Cleaner Card-Based Audit Trail for View Details */}
             <h4 style={{ color: '#888', letterSpacing: '1px', fontSize: '0.8rem', marginBottom: '16px', textTransform: 'uppercase', fontWeight: '600', marginTop: '40px', borderTop: '1px solid #eee', paddingTop: '32px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
               Audit Trail
@@ -859,8 +851,6 @@ export default function AdminDashboard() {
                   <div key={log.id} style={{ background: '#f8f9fa', borderRadius: '8px', padding: '16px', marginBottom: '12px' }}>
                     
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      
-                      {/* FIXED: Display full string (no split) */}
                       <span style={{ fontWeight: '600', fontSize: '0.95rem', color: '#00204a' }}>
                         {log.user_email || 'System User'}
                       </span>

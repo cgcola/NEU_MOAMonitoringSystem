@@ -31,29 +31,25 @@ export default function FacultyDashboard({ canMaintain }) {
   const [dateTo, setDateTo] = useState('')
   
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
+  
+  // --- PAGINATION STATE ---
   const [currentPage, setCurrentPage] = useState(1)
-  // Dynamic Pagination State
-  const [itemsPerPage, setItemsPerPage] = useState(8); // Default to
+  
+  const getItemsPerPage = () => window.innerWidth <= 768 ? 4 : 8;
+  const [itemsPerPage, setItemsPerPage] = useState(getItemsPerPage())
 
-  // Listen for window resize
+  // Dynamic Resize Listener
   useEffect(() => {
     const handleResize = () => {
-      if (window.innerWidth <= 768) {
-        setItemsPerPage(4); // Show 4 cards on mobile phones
-      } else if (window.innerWidth <= 1024) {
-        setItemsPerPage(6); // Show 6 cards on tablets
-      } else {
-        setItemsPerPage(8); // Show 8 cards on desktop
+      const newItems = getItemsPerPage();
+      if (newItems !== itemsPerPage) {
+        setItemsPerPage(newItems);
+        setCurrentPage(1); 
       }
     };
-
-    // Run it once on load
-    handleResize();
-
-    // Attach the event listener
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [itemsPerPage]);
 
   const [formData, setFormData] = useState({ hte_id: '', company_name: '', address: '', contact_person: '', email_address: '', industry_type: '', status: '', endorsed_by_college: '', effective_date: '', expiration_date: '' })
 
@@ -61,7 +57,6 @@ export default function FacultyDashboard({ canMaintain }) {
     fetchMOAs(); 
     getUserData(); 
 
-    // Set up real-time listener for the moas table
     const facultyChannel = supabase
       .channel('faculty-moas')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'moas' }, () => {
@@ -126,6 +121,14 @@ export default function FacultyDashboard({ canMaintain }) {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
+  const stats = {
+    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
+    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING')).length,
+    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING')).length,
+    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING')).length,
+  }
+
+  // --- 1. FILTER ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -138,6 +141,7 @@ export default function FacultyDashboard({ canMaintain }) {
            ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
+  // --- 2. SORT ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; } 
@@ -147,15 +151,10 @@ export default function FacultyDashboard({ canMaintain }) {
     return 0;
   });
 
+  // --- 3. SLICE ---
   const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, ((currentPage - 1) * itemsPerPage) + itemsPerPage)
   const totalPages = Math.ceil(sortedMoas.length / itemsPerPage)
 
-  const stats = {
-    approved: moas.filter(m => m.status?.toUpperCase().includes('APPROVED')).length,
-    processing: moas.filter(m => m.status?.toUpperCase().includes('PROCESSING')).length,
-    expired: moas.filter(m => m.status?.toUpperCase().includes('EXPIRED') && !m.status?.toUpperCase().includes('EXPIRING')).length,
-    expiring: moas.filter(m => m.status?.toUpperCase().includes('EXPIRING')).length,
-  }
 
   const handleAddNew = async () => {
     const currentYear = new Date().getFullYear()
@@ -269,11 +268,10 @@ export default function FacultyDashboard({ canMaintain }) {
                 <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
               </div>
               
-              {/* Filter Button - Uses CSS class for responsive stretching */}
+              {/* Filter Button */}
               <button className="filter-btn-responsive" onClick={() => setShowFilters(!showFilters)} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 20px', background: '#f8f9fa', border: '1px solid #eaeaea', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', color: '#555' }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg> 
                 <span className="desktop-only" style={{ marginLeft: '8px' }}>Filters</span>
-                
                 {hasActiveFilters && <span style={{ position: 'absolute', top: '-6px', right: '-4px', background: '#0d6efd', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', width: '20px', height: '20px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2px #fff' }}>{activeFilterCount}</span>}
               </button>
 
