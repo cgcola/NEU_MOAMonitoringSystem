@@ -26,6 +26,7 @@ export default function AdminDashboard() {
   const [toast, setToast] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState(null)
 
+  // MOA Filters
   const [showFilters, setShowFilters] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterCollege, setFilterCollege] = useState('ALL')
@@ -34,7 +35,14 @@ export default function AdminDashboard() {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
 
+  // USER Filters
   const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userFilterRole, setUserFilterRole] = useState('ALL')
+  const [userFilterStatus, setUserFilterStatus] = useState('ALL')
+
+  // ONBOARDING Modal States
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [selectedCollege, setSelectedCollege] = useState('')
 
   const [moaSortConfig, setMoaSortConfig] = useState({ key: 'hte_id', direction: 'desc' })
   const [userSortConfig, setUserSortConfig] = useState({ key: 'full_name', direction: 'asc' })
@@ -77,8 +85,18 @@ export default function AdminDashboard() {
     };
   }, [])
   
+  // Triggers the onboarding modal if the current user is missing a college
+  useEffect(() => {
+    if (userEmail && users.length > 0) {
+      const myProfile = users.find(u => u.email === userEmail);
+      if (myProfile && (!myProfile.college || myProfile.college.trim() === '')) {
+        setShowOnboarding(true);
+      }
+    }
+  }, [userEmail, users])
+
   useEffect(() => { setCurrentPage(1) }, [searchQuery, filterCollege, filterIndustry, filterStatus, dateFrom, dateTo, isViewingDeleted])
-  useEffect(() => { setUserCurrentPage(1) }, [userSearchQuery])
+  useEffect(() => { setUserCurrentPage(1) }, [userSearchQuery, userFilterRole, userFilterStatus])
 
   const showToast = (message, type = 'success') => { setToast({ message, type }); setTimeout(() => setToast(null), 3000) }
 
@@ -124,6 +142,18 @@ export default function AdminDashboard() {
     setMoas(processedMoas); setUsers(userData || []); setLogs(logData || []); setLoading(false)
   }
 
+  const handleSaveCollege = async () => {
+    if (!selectedCollege) return;
+    const { error } = await supabase.from('profiles').update({ college: selectedCollege }).eq('email', userEmail);
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      setShowOnboarding(false);
+      showToast('Welcome aboard! College saved successfully.', 'success');
+      fetchData();
+    }
+  }
+
   const clearFilters = () => { setSearchQuery(''); setFilterCollege('ALL'); setFilterIndustry('ALL'); setFilterStatus('ALL'); setDateFrom(''); setDateTo(''); }
   const handleSortMoas = (key) => setMoaSortConfig({ key, direction: moaSortConfig.key === key && moaSortConfig.direction === 'asc' ? 'desc' : 'asc' });
   const handleSortUsers = (key) => setUserSortConfig({ key, direction: userSortConfig.key === key && userSortConfig.direction === 'asc' ? 'desc' : 'asc' });
@@ -131,7 +161,7 @@ export default function AdminDashboard() {
   const activeFilterCount = (searchQuery ? 1 : 0) + (filterCollege !== 'ALL' ? 1 : 0) + (filterIndustry !== 'ALL' ? 1 : 0) + (filterStatus !== 'ALL' ? 1 : 0) + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
   const hasActiveFilters = activeFilterCount > 0
 
-  // 1. FILTER MOAS
+  // --- 1. FILTER MOAS ---
   const filteredMoas = moas.filter(m => {
     let matchesDateRange = true;
     if (dateFrom && m.effective_date) matchesDateRange = matchesDateRange && new Date(m.effective_date) >= new Date(dateFrom)
@@ -144,7 +174,7 @@ export default function AdminDashboard() {
       matchesDateRange && ((m.company_name?.toLowerCase().includes(searchLower)) || (m.hte_id?.toLowerCase().includes(searchLower)) || (m.contact_person?.toLowerCase().includes(searchLower)) || (m.address?.toLowerCase().includes(searchLower)))
   })
 
-  // 2. SORT MOAS
+  // --- 2. SORT MOAS ---
   const sortedMoas = [...filteredMoas].sort((a, b) => {
     let aVal = a[moaSortConfig.key]; let bVal = b[moaSortConfig.key];
     if (moaSortConfig.key === 'expiration_date') { aVal = aVal ? new Date(aVal).getTime() : 0; bVal = bVal ? new Date(bVal).getTime() : 0; }
@@ -154,7 +184,17 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  const sortedUsers = [...users.filter(u => u.full_name?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.email?.toLowerCase().includes(userSearchQuery.toLowerCase()) || u.role?.toLowerCase().includes(userSearchQuery.toLowerCase()))].sort((a, b) => {
+  // --- 3. FILTER & SORT USERS ---
+  const filteredUsers = users.filter(u => {
+    const searchLower = userSearchQuery.toLowerCase();
+    const matchesSearch = (u.full_name?.toLowerCase().includes(searchLower)) || (u.email?.toLowerCase().includes(searchLower));
+    const matchesRole = userFilterRole === 'ALL' || (u.role || '').toLowerCase() === userFilterRole.toLowerCase();
+    const matchesStatus = userFilterStatus === 'ALL' || (userFilterStatus === 'BLOCKED' ? u.is_blocked : !u.is_blocked);
+    
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  const sortedUsers = [...filteredUsers].sort((a, b) => {
     let aVal = userSortConfig.key === 'full_name' ? (a.full_name || a.email.split('@')[0]).toLowerCase() : (a[userSortConfig.key] || '').toLowerCase();
     let bVal = userSortConfig.key === 'full_name' ? (b.full_name || b.email.split('@')[0]).toLowerCase() : (b[userSortConfig.key] || '').toLowerCase();
     if (aVal < bVal) return userSortConfig.direction === 'asc' ? -1 : 1;
@@ -162,7 +202,7 @@ export default function AdminDashboard() {
     return 0;
   });
 
-  // --- 3. SLICE DATA ---
+  // --- 4. SLICE DATA ---
   const currentMoas = sortedMoas.slice((currentPage - 1) * itemsPerPage, (currentPage - 1) * itemsPerPage + itemsPerPage)
   const totalPages = Math.max(1, Math.ceil(sortedMoas.length / itemsPerPage))
 
@@ -291,6 +331,28 @@ export default function AdminDashboard() {
     <div className="dashboard-container">
       <AnimatedBackground />
       <Header role="Admin" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
+
+      {/* --- ONBOARDING MODAL OVERLAY --- */}
+      {showOnboarding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', padding: '40px', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'slideDown 0.3s ease' }}>
+            <h2 style={{ margin: '0 0 12px 0', color: '#00204a', fontSize: '1.5rem', fontWeight: '700' }}>Welcome to NEU MOA! 👋</h2>
+            <p style={{ color: '#666', marginBottom: '24px', fontSize: '0.95rem', lineHeight: '1.5' }}>To complete your profile, please select your college from the list below.</p>
+            
+            <div style={{ marginBottom: '32px' }}>
+              <FormLabel text="My College" required />
+              <select value={selectedCollege} onChange={e => setSelectedCollege(e.target.value)} style={inputStyle}>
+                <option value="" disabled hidden>Please choose a college...</option>
+                {NEU_COLLEGES.filter(c => !c.includes('N/A')).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            
+            <button onClick={handleSaveCollege} disabled={!selectedCollege} style={{ width: '100%', padding: '14px', background: selectedCollege ? '#0d6efd' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: selectedCollege ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s ease' }}>
+              Save & Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {currentView === 'list' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>
@@ -540,7 +602,29 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="dashboard-card" style={{ padding: '0', overflow: 'hidden', marginBottom: '24px' }}>
+          <div className="dashboard-card" style={{ padding: '20px', overflow: 'visible', marginBottom: '24px' }}>
+            
+            {/* --- USER SEARCH & FILTERS --- */}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', marginBottom: '20px' }}>
+              <div style={{ flex: '1 1 250px', minWidth: '250px', position: 'relative' }}>
+                <input type="text" className="search-bar" style={{ width: '100%', padding: '12px 12px 12px 44px', background: '#fff', border: '1px solid #eaeaea', borderRadius: '8px', boxSizing: 'border-box', outline: 'none' }} placeholder="Search users by name or email..." value={userSearchQuery} onChange={(e) => setUserSearchQuery(e.target.value)} />
+                <svg style={{ position: 'absolute', left: '16px', top: '14px', color: '#999' }} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              </div>
+              
+              <select value={userFilterRole} onChange={e => setUserFilterRole(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #eaeaea', outline: 'none', backgroundColor: '#f8f9fa', color: '#555', fontWeight: '600' }}>
+                <option value="ALL">All Roles</option>
+                <option value="admin">Admin</option>
+                <option value="faculty">Faculty</option>
+                <option value="student">Student</option>
+              </select>
+
+              <select value={userFilterStatus} onChange={e => setUserFilterStatus(e.target.value)} style={{ padding: '12px', borderRadius: '8px', border: '1px solid #eaeaea', outline: 'none', backgroundColor: '#f8f9fa', color: '#555', fontWeight: '600' }}>
+                <option value="ALL">All Status</option>
+                <option value="ACTIVE">Active Users</option>
+                <option value="BLOCKED">Blocked Users</option>
+              </select>
+            </div>
+
             <div className="table-container desktop-only">
               <table className="modern-table">
                 <thead>
@@ -602,7 +686,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Mobile User Cards */}
-            <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '16px' }}>
+            <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {paginatedUsers.map(u => (
                 <div key={u.id} style={{ border: '1px solid #eee', borderRadius: '12px', padding: '16px', background: u.is_blocked ? '#fff5f5' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
                   <div style={{ fontWeight: '700', color: '#00204a', fontSize: '1.05rem', marginBottom: '2px' }}>{u.full_name || u.email.split('@')[0]}</div>
