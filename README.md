@@ -2,7 +2,7 @@
 
 A comprehensive, real-time full-stack web application designed to manage, track, and secure Memorandums of Agreement (MOAs) for New Era University. Built to streamline the internship and partnership pipeline between the university and Host Training Establishments (HTEs).
 
-**[View Live Application Here](https://neu-moa-monitoring-system-orpin.vercel.app/)**
+**Live Demo / Public Link:** [https://neu-moa-monitoring-system-orpin.vercel.app/](https://neu-moa-monitoring-system-orpin.vercel.app/)
 
 ---
 
