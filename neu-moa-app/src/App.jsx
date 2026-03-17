@@ -11,7 +11,6 @@ export default function App() {
   const [canMaintain, setCanMaintain] = useState(false)
   const [loading, setLoading] = useState(true)
   
-  // --- NEW: UI States for Blocking ---
   const [isBlockedUI, setIsBlockedUI] = useState(false)
   const [blockMessage, setBlockMessage] = useState('')
 
@@ -31,7 +30,7 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [isBlockedUI])
 
-  // (Real-Time Block Listener)
+  // THE GLOBAL MASTER BOUNCER
   useEffect(() => {
     if (session?.user?.id) {
       const blockListener = supabase.channel('global-block-watch')
@@ -41,12 +40,10 @@ export default function App() {
             table: 'profiles', 
             filter: `id=eq.${session.user.id}` 
           }, async (payload) => {
-            
-          // If the admin clicks block, switch to the Blocked UI instantly
           if (payload.new && payload.new.is_blocked === true) {
             setBlockMessage("Your account has been suspended by an Administrator while you were active.");
             setIsBlockedUI(true);
-            await supabase.auth.signOut(); // Silently kill their session in the background
+            await supabase.auth.signOut(); 
           }
         })
         .subscribe();
@@ -55,47 +52,88 @@ export default function App() {
     }
   }, [session])
 
-  const fetchUserProfile = async (user, retries = 3) => {
+  const fetchUserProfile = async (user) => {
+    // Try to fetch the user's profile
     const { data, error } = await supabase
       .from('profiles')
       .select('role, can_maintain, is_blocked') 
       .eq('id', user.id)
       .single()
 
-    if (error && error.code === 'PGRST116' && retries > 0) {
-      console.log("Waiting for backend database trigger to finish...")
-      setTimeout(() => fetchUserProfile(user, retries - 1), 500)
-      return
-    }
-
+    // If it EXISTS, load them in!
     if (data) {
-      // Check at the door: If they log in while blocked, show the UI
       if (data.is_blocked) {
         setBlockMessage("Your access to the NEU MOA Monitoring System has been revoked. Please contact an Administrator if you believe this is a mistake.");
         setIsBlockedUI(true);
         setLoading(false);
-        await supabase.auth.signOut(); // Kill the invalid session
+        await supabase.auth.signOut(); 
         return; 
       }
-
       setUserRole(data.role.toLowerCase())
       setCanMaintain(data.can_maintain || false)
-    } else {
-      setUserRole('student')
-      setCanMaintain(false)
+      setLoading(false)
+      return;
     }
 
-    setLoading(false)
+    // If it DOES NOT EXIST (406 PGRST116 Error), Create it securely from the frontend!
+    if (error && error.code === 'PGRST116') {
+      console.log("No profile found. Creating a smart profile now...")
+      
+      // Check if Admin pre-approved them in pending_roles
+      const { data: pendingData } = await supabase
+        .from('pending_roles')
+        .select('role, college')
+        .eq('email', user.email)
+        .single()
+
+      let finalRole = 'student';
+      let finalCollege = '';
+      let finalMaintain = false;
+
+      // Map the pending roles properly
+      if (pendingData) {
+        const pr = pendingData.role.toLowerCase();
+        finalCollege = pendingData.college || '';
+        
+        if (pr === 'admin') { 
+          finalRole = 'admin'; 
+          finalMaintain = true; 
+        } else if (pr.includes('faculty')) {
+          finalRole = 'faculty';
+          finalMaintain = pr.includes('maintainer');
+        }
+      }
+
+      const newProfile = {
+        id: user.id,
+        email: user.email,
+        role: finalRole,
+        full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+        college: finalCollege,
+        can_maintain: finalMaintain,
+        is_blocked: false
+      }
+
+      // Insert the profile to the database
+      const { error: insertError } = await supabase.from('profiles').insert([newProfile])
+      
+      if (insertError) {
+        console.error("Error creating profile:", insertError)
+      }
+
+      // Set the UI state so they can enter the app immediately
+      setUserRole(finalRole)
+      setCanMaintain(finalMaintain)
+      setLoading(false)
+    }
   }
 
   if (loading) return <div style={{ textAlign: 'center', marginTop: '100px', color: '#666', fontFamily: 'system-ui, sans-serif' }}>Loading Workspace...</div>
   
-  // If they are blocked, ONLY show this restricted screen
   if (isBlockedUI) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', background: '#f8f9fa', fontFamily: 'system-ui, sans-serif', padding: '20px' }}>
         <div style={{ background: '#fff', padding: '48px 40px', borderRadius: '16px', maxWidth: '450px', width: '100%', textAlign: 'center', boxShadow: '0 10px 40px rgba(0,0,0,0.08)', borderTop: '6px solid #dc3545', animation: 'fadeIn 0.4s ease' }}>
-          
           <div style={{ width: '80px', height: '80px', background: '#fce8e6', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px auto' }}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#dc3545" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -103,10 +141,8 @@ export default function App() {
               <line x1="12" y1="15" x2="12" y2="18"></line>
             </svg>
           </div>
-          
           <h1 style={{ fontSize: '1.75rem', fontWeight: '800', color: '#111', margin: '0 0 16px 0', letterSpacing: '-0.5px' }}>Access Denied</h1>
           <p style={{ color: '#555', fontSize: '1rem', lineHeight: '1.5', margin: '0 0 32px 0' }}>{blockMessage}</p>
-          
           <button 
             onClick={() => window.location.reload()} 
             style={{ width: '100%', padding: '14px', background: '#f0f0f0', color: '#333', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s' }}
@@ -120,7 +156,6 @@ export default function App() {
     )
   }
 
-  // Normal App Routing
   if (!session) return <Login />
 
   if (userRole === 'admin') return <AdminDashboard />
