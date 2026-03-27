@@ -248,15 +248,23 @@ export default function AdminDashboard() {
     if (error) { showToast(error.message, 'error'); } else { showToast(`User successfully updated.`, 'success'); fetchData(); }
   }
 
-  // --- NEW ROLE CHANGE FUNCTION ---
-  const handleRoleChange = async (userId, newRole) => {
+  // --- UPGRADED ROLE CHANGE LOGIC ---
+  const handleRoleChange = async (user, newRole) => {
     let updates = { role: newRole };
     
-    // Automatically manage maintainer rights based on new role
-    if (newRole === 'admin') updates.can_maintain = true;
-    if (newRole === 'student') updates.can_maintain = false;
+    if (newRole === 'admin') {
+      updates.can_maintain = true;
+      updates.college = 'N/A (For Admin)';
+    } else {
+      if (newRole === 'student') updates.can_maintain = false;
+      
+      // If they are being demoted from an admin, wipe out the 'N/A' so it becomes Pending
+      if (user.college && user.college.includes('N/A')) {
+        updates.college = '';
+      }
+    }
 
-    const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+    const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
     if (error) {
       showToast(error.message, 'error');
     } else {
@@ -365,6 +373,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {/* --- DESKTOP MOA TABLE --- */}
             <div className="table-container desktop-only" style={{ marginTop: '24px' }}>
               <table className="modern-table">
                 <thead>
@@ -441,6 +450,62 @@ export default function AdminDashboard() {
               </table>
             </div>
 
+            {/* --- NEW: MOBILE MOA CARDS --- */}
+            <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+              {currentMoas.map((moa) => {
+                const moaLogs = logs.filter(l => String(l.moa_id) === String(moa.id));
+                return (
+                  <div key={moa.id} style={{ border: '1px solid #eee', borderRadius: '12px', padding: '16px', background: isViewingDeleted ? '#fdf5f5' : '#fff', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '0.9rem', color: '#333' }}>{moa.hte_id}</div>
+                      {renderBadge(moa.status)}
+                    </div>
+                    <div style={{ fontWeight: '700', color: '#00204a', fontSize: '1.1rem', marginBottom: '4px' }}>{moa.company_name}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#888', marginBottom: '12px' }}>{moa.contact_person}</div>
+                    
+                    <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '4px' }}><strong>Industry:</strong> {moa.industry_type?.split('/')[0]}</div>
+                    <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '12px' }}><strong>College:</strong> {moa.endorsed_by_college?.replace('College of ', '')}</div>
+                    
+                    {(!moa.status.includes('Processing') && moa.expiration_date) && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.85rem', color: '#666', marginBottom: '16px' }}>
+                        <IconCalendar /> Exp: {new Date(moa.expiration_date).toLocaleDateString()}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #f0f0f0', paddingTop: '12px' }}>
+                      <button onClick={() => setHistoryPopoverId(historyPopoverId === moa.id ? null : moa.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', color: '#0d6efd', fontSize: '0.85rem', fontWeight: '600' }}>
+                        <IconHistory /> Logs {moaLogs.length > 0 && `(${moaLogs.length})`}
+                      </button>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <button onClick={() => handleView(moa)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#0d6efd' }}><IconEye /></button>
+                        {!isViewingDeleted ? (
+                          <>
+                            <button onClick={() => handleEdit(moa)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#198754' }}><IconEdit /></button>
+                            <button onClick={() => handleDeleteRestore(moa.id, false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#dc3545' }}><IconTrash /></button>
+                          </>
+                        ) : (
+                          <button onClick={() => handleDeleteRestore(moa.id, true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#198754' }}><IconRestore /></button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Mobile Logs Dropdown */}
+                    {historyPopoverId === moa.id && (
+                      <div style={{ background: '#f8f9fa', borderRadius: '8px', padding: '12px', marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                        {moaLogs.map((log) => (
+                            <div key={log.id} style={{ fontSize: '0.75rem', marginBottom: '8px', borderBottom: '1px solid #eaeaea', paddingBottom: '8px' }}>
+                              <span style={{ fontWeight: 'bold', color: '#555' }}>{log.operation}</span> by {log.user_email}<br/>
+                              <span style={{ color: '#888' }}>{new Date(log.changed_at).toLocaleDateString()}</span>
+                            </div>
+                        ))}
+                        {moaLogs.length === 0 && <div style={{fontSize: '0.8rem', color: '#999'}}>No history found.</div>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {sortedMoas.length === 0 && <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>No records found.</div>}
+            </div>
+
             {totalPages > 1 && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '15px', marginTop: '24px' }}>
                 <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid', borderColor: currentPage === 1 ? '#e0e0e0' : 'var(--neu-blue)', background: currentPage === 1 ? '#f5f5f5' : 'transparent', color: currentPage === 1 ? '#999' : 'var(--neu-blue)', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Previous</button>
@@ -514,10 +579,10 @@ export default function AdminDashboard() {
                         <div style={{ fontSize: '0.8rem', color: '#888', marginTop: '2px' }}>{u.email}</div>
                       </td>
                       <td style={{ padding: '16px 24px', verticalAlign: 'middle' }}>
-                        {/* --- NEW INSTANT ROLE DROPDOWN --- */}
+                        {/* UPDATED: Pass the full 'u' object so the logic can see what college they currently have */}
                         <select
                           value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          onChange={(e) => handleRoleChange(u, e.target.value)}
                           style={{
                             padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize',
                             color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e',
@@ -576,7 +641,7 @@ export default function AdminDashboard() {
                   <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                     <select
                       value={u.role}
-                      onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                      onChange={(e) => handleRoleChange(u, e.target.value)}
                       style={{
                         padding: '4px 8px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: '600', textTransform: 'capitalize',
                         color: u.role === 'admin' ? '#9333ea' : u.role === 'faculty' ? '#0d6efd' : '#1e8e3e',
