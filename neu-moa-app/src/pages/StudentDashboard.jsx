@@ -12,7 +12,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true)
   
   const [userEmail, setUserEmail] = useState('')
-  const [userId, setUserId] = useState('') // <--- NEW: Track the user's ID
+  const [userId, setUserId] = useState('') //Track the user's ID
   const [userName, setUserName] = useState('')
   const [userAvatar, setUserAvatar] = useState('')
 

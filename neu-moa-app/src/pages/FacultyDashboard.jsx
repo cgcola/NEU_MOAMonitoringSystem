@@ -16,6 +16,10 @@ export default function FacultyDashboard({ canMaintain }) {
   const [userName, setUserName] = useState('')
   const [userAvatar, setUserAvatar] = useState('')
 
+  // ONBOARDING Modal States
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [selectedCollege, setSelectedCollege] = useState('')
+
   const [currentView, setCurrentView] = useState('list')
   const [selectedMoa, setSelectedMoa] = useState(null)
   
@@ -78,6 +82,23 @@ export default function FacultyDashboard({ canMaintain }) {
         setUserAvatar(user.user_metadata.avatar_url || user.user_metadata.picture || '')
         setUserName(formatName(user.user_metadata.full_name || user.user_metadata.name || ''))
       }
+      
+      // Check if they are missing a college ---
+      const { data: myProfile } = await supabase.from('profiles').select('college').eq('id', user.id).single();
+      if (myProfile && (!myProfile.college || myProfile.college.trim() === '')) {
+        setShowOnboarding(true);
+      }
+    }
+  }
+
+  const handleSaveCollege = async () => {
+    if (!selectedCollege) return;
+    const { error } = await supabase.from('profiles').update({ college: selectedCollege }).eq('email', userEmail);
+    if (error) {
+      showToast(error.message, 'error');
+    } else {
+      setShowOnboarding(false);
+      showToast('Welcome aboard! College saved successfully.', 'success');
     }
   }
 
@@ -228,6 +249,28 @@ export default function FacultyDashboard({ canMaintain }) {
     <div className="dashboard-container">
       <AnimatedBackground />
       <Header role="Faculty" userName={userName} userEmail={userEmail} userAvatar={userAvatar} handleSignOut={handleSignOut} />
+
+      {/* --- ONBOARDING MODAL OVERLAY --- */}
+      {showOnboarding && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
+          <div style={{ background: '#fff', padding: '40px', borderRadius: '16px', maxWidth: '450px', width: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)', animation: 'slideDown 0.3s ease' }}>
+            <h2 style={{ margin: '0 0 12px 0', color: '#00204a', fontSize: '1.5rem', fontWeight: '700' }}>Welcome to NEU MOA! 👋</h2>
+            <p style={{ color: '#666', marginBottom: '24px', fontSize: '0.95rem', lineHeight: '1.5' }}>To complete your profile, please select your college from the list below.</p>
+            
+            <div style={{ marginBottom: '32px' }}>
+              <FormLabel text="My College" required />
+              <select id="college" name="college" value={selectedCollege} onChange={e => setSelectedCollege(e.target.value)} style={inputStyle}>
+                <option value="" disabled hidden>Please choose a college...</option>
+                {NEU_COLLEGES.filter(c => !c.includes('N/A')).map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            
+            <button onClick={handleSaveCollege} disabled={!selectedCollege} style={{ width: '100%', padding: '14px', background: selectedCollege ? '#0d6efd' : '#ccc', color: '#fff', border: 'none', borderRadius: '8px', cursor: selectedCollege ? 'pointer' : 'not-allowed', fontWeight: '600', fontSize: '1rem', transition: 'background 0.2s ease' }}>
+              Save & Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {currentView === 'list' && (
         <div style={{ animation: 'fadeIn 0.3s ease' }}>

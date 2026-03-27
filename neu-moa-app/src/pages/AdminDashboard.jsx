@@ -248,7 +248,7 @@ export default function AdminDashboard() {
     if (error) { showToast(error.message, 'error'); } else { showToast(`User successfully updated.`, 'success'); fetchData(); }
   }
 
-  // --- UPGRADED ROLE CHANGE LOGIC ---
+  // Role Change Logic
   const handleRoleChange = async (user, newRole) => {
     let updates = { role: newRole };
     
@@ -744,7 +744,13 @@ export default function AdminDashboard() {
                   required
                 >
                   <option value="" disabled hidden>Please choose a college...</option>
-                  {NEU_COLLEGES.map(c => <option key={c} value={c}>{c}</option>)}
+                  
+                  {/* Filter out 'N/A' if the role is student or faculty */}
+                  {NEU_COLLEGES
+                    .filter(c => newUserParams.role === 'admin' ? true : !c.includes('N/A'))
+                    .map(c => <option key={c} value={c}>{c}</option>)
+                  }
+                  
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '16px' }}>
